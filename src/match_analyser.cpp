@@ -12,7 +12,6 @@ using namespace std;
 	} while (0)
 
 #define PRINT_RANGES
-// #define REVERSE_MATCH_RESULT
 
 static const unsigned int END_KEY = 0xFFFFFFFF;
 
@@ -39,7 +38,8 @@ void MatchAnalyser::handle_packet( Packet & pkt, const udp::endpoint & from_addr
 	{
 		unsigned lb = ntohl(p[cnt++]);
 		unsigned tb = ntohl(p[cnt++]);
-		sec_man_.add_section( MatchSection(tb, lb, CommArg::comm_arg().merge_unit) );
+		if (lb || tb)
+			sec_man_.add_section( MatchSection(tb, lb, CommArg::comm_arg().merge_unit) );
 	}
 }
 

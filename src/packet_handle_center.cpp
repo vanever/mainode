@@ -76,66 +76,6 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 		FDU_LOG(INFO) << "stock_data = " << ntohl(stock_data);
 	}
 
-//	//---------------------------------------------------------------------------------- 
-//	// matcher add info
-//	else if (type == CONN_BUILD)
-//	{
-//		PACKET_MSG(DEBUG, length, end_point, type, index, "add node msg");
-//
-//		u_char * pc = p->data_ptr();
-//		unsigned nbits = pc[0];
-//		unsigned merge_unit = pc[1];
-//
-//		bool nbits_ok = nbits == 1 || nbits == 2 || nbits == 4;
-//		bool merge_unit_ok = merge_unit == 1 || merge_unit == 2 || merge_unit == 4;
-//
-//		if (!nbits_ok)
-//		{
-//			FDU_LOG(ERR) << "illegal nbits: " << nbits << "using defaults: " << 32;
-//			nbits = 1;
-//		}
-//		nbits *= 32;
-//
-//		if (!merge_unit_ok)
-//		{
-//			FDU_LOG(ERR) << "illegal merge_unit: " << nbits << "using merge_unit: " << 32;
-//			merge_unit = 4;
-//		}
-//		merge_unit *= 8;
-//
-//		MatcherPtr m;
-//		if ( (m = MatcherManager::instance().find(Matcher(end_point))) )
-//		{
-//			FDU_LOG(WARN) << "repeated matcher in added node";
-//			ResponPacket pkt(type + 1, index + 1);
-//			u_char * p = pkt.data_ptr();
-//			p[0] = m->match_threshold();
-//			p[1] = m->merge_threshold();
-//			Server::instance().send( pkt.to_udp_buffer(), end_point );	// node need a response
-//			return;
-//		}
-//		else
-//		{
-//			m = MatcherManager::instance().make_matcher( end_point );
-//		}
-//
-//		m->set_nbits(nbits);
-//		m->set_merge_unit(merge_unit);
-//
-//		MatcherManager::instance().add_matcher( m );
-//	}
-
-//	//--------------------------------------------------------------------------------------- 
-//	// connection build
-//	else if (type == CONN_BUILD + 2)
-//	{
-//		PACKET_MSG(DEBUG, length, end_point, type, index, "connection build");
-//		if (ConnectionBuilder * c = ConnectionBuilder::get_build_task(end_point))
-//		{
-//			c->set_built(true);
-//		}
-//	}
-//
 	//--------------------------------------------------------------------------------------- 
 	// connection build
 	else if (type == CONN_BUILD + 1)
