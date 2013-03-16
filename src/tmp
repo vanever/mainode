@@ -1,0 +1,170 @@
+63,64c63,64
+< 		if (MatcherManager::instance().get_matcher_state( end_point ) ==  Matcher::BUSY )
+< 			MatcherManager::instance().set_matcher_state( end_point, Matcher::SENDING );
+---
+> //		if (MatcherManager::instance().get_matcher_state( end_point ) ==  Matcher::BUSY )
+> //			MatcherManager::instance().set_matcher_state( end_point, Matcher::SENDING );
+69,70d68
+< 	//---------------------------------------------------------------------------------- 
+< 	// bit feature
+75,76c73,74
+< 		unsigned stock_data = *(unsigned*)p->data_ptr();
+< 		FDU_LOG(INFO) << "stock_data = " << ntohl(stock_data);
+---
+> 		unsigned load = ntohl(cast<unsigned>(pkt.data_ptr()));
+> 		FDU_LOG(DEBUG) << "report LOAD:	" << load;
+78,81c76,85
+< 
+< //	//---------------------------------------------------------------------------------- 
+< //	// matcher add info
+< //	else if (type == CONN_BUILD)
+---
+> 	//--------------------------------------------------------------------------------------- 
+> 	// point data from 1# FPGA
+> 	else if (type == EXTRACT_RECVING || type == EXTRACT_END)
+> 	{
+> 		PACKET_MSG(DEBUG, length, end_point, type, index, "extract result");
+> 		Server::instance().point_man()->handle_packet( pkt );
+> 	}
+> 	//--------------------------------------------------------------------------------------- 
+> 	// img response from 1# FPGA
+> //	else if ( type == IMG_SENDING + 1 || type == IMG_START + 1 || type == IMG_END + 1 || type == IMG_ALL_END + 1 )
+83,95c87,93
+< //		PACKET_MSG(DEBUG, length, end_point, type, index, "add node msg");
+< //
+< //		u_char * pc = p->data_ptr();
+< //		unsigned nbits = pc[0];
+< //		unsigned merge_unit = pc[1];
+< //
+< //		bool nbits_ok = nbits == 1 || nbits == 2 || nbits == 4;
+< //		bool merge_unit_ok = merge_unit == 1 || merge_unit == 2 || merge_unit == 4;
+< //
+< //		if (!nbits_ok)
+< //		{
+< //			FDU_LOG(ERR) << "illegal nbits: " << nbits << "using defaults: " << 32;
+< //			nbits = 1;
+---
+> //		u_char ctrl  = pkt.ctrl();
+> //		GrayImageWindow * window = Server::instance().gray_image_window();
+> //		PACKET_MSG(DEBUG, length, end_point, type, index, "image response");
+> //
+> //		if (ctrl == CTRL_PAUSE)
+> //		{	// no image confirm to block send thread
+> //			FDU_LOG(INFO) << "FPGA request PAUSE" << endl;
+97,99c95
+< //		nbits *= 32;
+< //
+< //		if (!merge_unit_ok)
+---
+> //		else if (ctrl == CTRL_RECOVER)
+101,115c97,100
+< //			FDU_LOG(ERR) << "illegal merge_unit: " << nbits << "using merge_unit: " << 32;
+< //			merge_unit = 4;
+< //		}
+< //		merge_unit *= 8;
+< //
+< //		MatcherPtr m;
+< //		if ( (m = MatcherManager::instance().find(Matcher(end_point))) )
+< //		{
+< //			FDU_LOG(WARN) << "repeated matcher in added node";
+< //			ResponPacket pkt(type + 1, index + 1);
+< //			u_char * p = pkt.data_ptr();
+< //			p[0] = m->match_threshold();
+< //			p[1] = m->merge_threshold();
+< //			Server::instance().send( pkt.to_udp_buffer(), end_point );	// node need a response
+< //			return;
+---
+> //			if (window->confirm(index - 1))
+> //			{
+> //				// do nothing
+> //			}
+118,125c103
+< //		{
+< //			m = MatcherManager::instance().make_matcher( end_point );
+< //		}
+< //
+< //		m->set_nbits(nbits);
+< //		m->set_merge_unit(merge_unit);
+< //
+< //		MatcherManager::instance().add_matcher( m );
+---
+> //			FDU_LOG(ERR) << "unknown control in image response: " << ctrl;
+127d104
+< 
+129,130c106,107
+< //	// connection build
+< //	else if (type == CONN_BUILD + 2)
+---
+> //	// receiving point response from 2~59# FPGA
+> //	else if (type == POINT_SENDING + 1 || type == POINT_START + 1 || type == POINT_END + 1)
+132,133c109,111
+< //		PACKET_MSG(DEBUG, length, end_point, type, index, "connection build");
+< //		if (ConnectionBuilder * c = ConnectionBuilder::get_build_task(end_point))
+---
+> //		ImagePointsWindow * window = Server::instance().image_points_window();
+> //		PACKET_MSG(DEBUG, length, end_point, type, index, "point response");
+> //		if ( window->confirm(index - 1) )
+135c113,117
+< //			c->set_built(true);
+---
+> //			if ( type == POINT_END + 1 )
+> //				FDU_LOG(INFO) << "confirm sending a group of points, waiting match results";
+> //
+> //			if ( !(++num_responses_point % 100) )
+> //				FDU_LOG(DEBUG) << "server get broad point response: " << num_responses_point;
+138d119
+< //
+149,187d129
+< 
+< 	//---------------------------------------------------------------------------------- 
+< 	// node wanna quit
+< 	else if (type == WANNA_QUIT)
+< 	{
+< 		PACKET_MSG(DEBUG, length, end_point, type, index, "wanna quit");
+< 		if ( MatcherPtr m = MatcherManager::instance().find(Matcher(end_point)) )
+< 		{
+< 			m->set_state( Matcher::TO_BE_COLLECTED );
+< 		}
+< 		else
+< 		{
+< 			FDU_LOG(ERR) << "WANNA_QUIT: cannot find node: " << end_point;
+< 		}
+< 		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point );
+< 	}
+< 
+< 	//---------------------------------------------------------------------------------- 
+< 	// node quited
+< 	else if (type == QUITED)
+< 	{
+< 		PACKET_MSG(DEBUG, length, end_point, type, index, "quited");
+< 		if ( MatcherPtr m = MatcherManager::instance().find(Matcher(end_point)) )
+< 		{
+< 			if (m->state() == Matcher::TO_BE_COLLECTED)
+< 			{
+< 				m->set_state( Matcher::COLLECTED );
+< 				MatcherManager::instance().remove_matcher( *m );
+< 			}
+< 			else if (m->state() != Matcher::COLLECTED)
+< 				FDU_LOG(ERR) << "node state error in QUITED process";
+< 		}
+< 		else
+< 		{
+< 			FDU_LOG(WARN) << "WANNA_QUIT: cannot find node: " << end_point;
+< 		}
+< 		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point );
+< 	}
+< 
+201c143
+< 				//				ASSERT( s == Matcher::LIB_LOADING, end_point << " wrong state is " << (int)s << " wanted is " << (int)Matcher::LIB_LOADING );
+---
+> //				ASSERT( s == Matcher::LIB_LOADING, end_point << " wrong state is " << (int)s << " wanted is " << (int)Matcher::LIB_LOADING );
+205,206d146
+< 					MatcherManager::instance().notify_wait_ready_matcher();
+< 					FDU_LOG(INFO) << end_point << " lib loaded. " << " Do notify choose_next_matcher";
+207a148,149
+> 				Server::instance().match_image_box()->notify_wait_get();
+> 				MatcherManager::instance().notify_wait_ready_matcher();
+212c154
+< 			PACKET_MSG(DEBUG, length, end_point, type, index, "lib response");
+---
+> 			// PACKET_MSG(DEBUG, length, end_point, type, index, "lib response");
