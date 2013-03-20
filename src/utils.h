@@ -85,9 +85,6 @@ namespace UTILS
 
 };
 
-typedef UTILS::image< lib_descriptor_type >   lib_image;
-typedef UTILS::image< match_descriptor_type > match_image;
-
 //-----------------------------------------------------------------
 
 #include "fdutils.h"

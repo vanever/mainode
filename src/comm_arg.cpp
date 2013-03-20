@@ -20,30 +20,6 @@ bool CommArg::parse_info_file( const char * file )
 	ptree pt;
 	read_info(file, pt);
 
-//	device        = pt.get<string>("device");
-//	extract_addr  = pt.get<string>("extract_addr");
-//	video_beg     = pt.get<int>("video_beg", 300);
-//	video_end     = pt.get<int>("video_end", 420);
-//	num_clients   = pt.get<int>("num_clients");
-//	do_surf       = pt.get<int>("do_surf", 0);
-//	match_timeout = pt.get<int>("match_timeout", 300);
-//	match_width   = pt.get<int>("match_width", MATCH_WIDTH);
-//	consider_extract_mac = pt.get<int>("consider_extract_mac", 0);
-
-//	random_loop   = pt.get<int>("random_loop", 0);
-//	image_ratio   = pt.get<int>("image_ratio", 0);	// default no image
-//	video_ratio   = pt.get<int>("video_ratio", 1);
-//	image_pause   = pt.get<int>("image_pause", 500);
-//	video_pause   = pt.get<int>("video_pause", 2000);
-
-//	manually_broadcast_points = pt.get<int>("manually", 0);
-//  sleep_time                = pt.get<int>("sleep_time", 1000);
-//	dump_matched_lib          = pt.get<int>("dump_matched_lib", 0);
-//	only_transform_lib        = pt.get<int>("only_transform_lib", 0);
-//	only_send_lib             = pt.get<int>("only_send_lib", 0);
-//	only_send_image           = pt.get<int>("only_send_image", 0);
-//	do_send_lib               = pt.get<int>("do_send_lib", 0);
-
 	out_file      = pt.get<string>("out_file", "match_result.xml");
 	log_file      = pt.get<string>("log_file", "log");
 	bind_ip       = pt.get<string>("bind_ip");

@@ -74,6 +74,11 @@ struct CommArg : boost::noncopyable
 	int only_send_image;
 	int do_send_lib;
 
+	//---------------------------------------------------------------------------------- 
+	// module id
+	unsigned mainode_id;
+	unsigned pdss_id;
+
 	//---------------------------------------------------------------------------------------
 	// static
 

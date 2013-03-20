@@ -39,14 +39,14 @@ void Server::start()
 		FDU_LOG(INFO) << "time load lib to mem: " << c.format();
 	}
 
-	foreach (const std::string & addr, this->arg()->client_addrs)
-	{	// if any, add matchers
-		MatcherPtr m =
-			MatcherManager::instance().make_matcher(udp::endpoint( addr_type::from_string(addr), arg()->fpga_port ));
-		m->set_merge_unit( CommArg::comm_arg().merge_unit );
-		m->set_nbits( CommArg::comm_arg().nbits );
-		MatcherManager::instance().add_matcher( m );
-	}
+//	foreach (const std::string & addr, this->arg()->client_addrs)
+//	{	// if any, add matchers
+//		MatcherPtr m =
+//			MatcherManager::instance().make_matcher(udp::endpoint( addr_type::from_string(addr), arg()->fpga_port ));
+//		m->set_merge_unit( CommArg::comm_arg().merge_unit );
+//		m->set_nbits( CommArg::comm_arg().nbits );
+//		MatcherManager::instance().add_matcher( m );
+//	}
 
 	//! running match streamline
 	boost::timer::cpu_timer cmatch;

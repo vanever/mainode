@@ -10,14 +10,14 @@
 #include <boost/asio.hpp>
 #include "command.hpp"
 
-using boost::asio::ip::tcp;
+using boost::asio::local::datagram_protocol;
 
 class CommandRecvService
 {
 
 public:
 
-	CommandRecvService (bool use_tcp = false);
+	CommandRecvService ();
 
 	/// pre-condition: CommArg must be valid
 	void run();
@@ -27,7 +27,9 @@ public:
 	static CommandRecvService & instance();
 
 	void stop_io_service() { io_.stop(); }
-	static CommandPtr make_command(u_char * buff, size_t length);
+	static CommandPtr make_command(u_char * buff, unsigned length, unsigned msg_id);
+
+	void send( const boost::asio::mutable_buffers_1 & buffer );
 
 private:
 
@@ -35,8 +37,10 @@ private:
 	void command_execute_loop();
 
 	boost::asio::io_service io_;
-	tcp::acceptor acceptor_;
-	bool use_tcp_;
+	datagram_protocol::endpoint client_;
+	datagram_protocol::endpoint server_;
+	datagram_protocol::endpoint sender_;
+	datagram_protocol::socket sock_;
 
 };
 

@@ -1,9 +1,11 @@
 #ifndef COMM_PARA_HPP
 #define COMM_PARA_HPP
 
-typedef unsigned char  u_char;
-typedef unsigned short match_descriptor_type;
-typedef unsigned int   lib_descriptor_type;
+typedef unsigned char      u_char;
+typedef unsigned char      U08;
+typedef unsigned short     U16;
+typedef unsigned int       U32;
+typedef unsigned long long U64;
 
 namespace {
 	const u_char      CONN_BUILD          = 0x70;

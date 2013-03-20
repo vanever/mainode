@@ -2,13 +2,39 @@
 #include "server.hpp"
 #include "dcsp_fifo.h"
 
+#define SERVER_SOCK_FILE "/tmp/DCSP_FIFO_A_SOCK"
+#define CLIENT_SOCK_FILE "/tmp/DCSP_FIFO_B_SOCK"
+
 using namespace boost::asio::ip;
 using namespace std;
 using namespace DCSP;
 
+namespace {
+	unsigned norm_dcsp_msg_id( unsigned id )
+	{
+		return ntohl(id);
+	}
+}
+
+struct DCSPPacket
+{
+	U32 src_id;
+	U32 snk_id;
+	U32 msg_id;
+	U16 msg_len;
+	u_char msg[1500];
+	void do_ntoh() {
+		src_id  = ntohl(src_id);
+		snk_id  = ntohl(snk_id);
+		msg_id  = ntohl(msg_id);
+		msg_len = ntohs(msg_len);
+	}
+} __attribute__((packed));
+
+
 CommandRecvService & CommandRecvService::instance()
 {
-	static CommandRecvService c(false);	// using DCSP FIFO as communication
+	static CommandRecvService c;	// using DCSP FIFO as communication
 	return c;
 }
 
@@ -19,11 +45,20 @@ bool CommandRecvService::end()
 	return server_end && no_command;
 }
 
-CommandRecvService::CommandRecvService(bool use_tcp)
-	: io_()
-	, acceptor_( io_, tcp::endpoint(ip::address(ip::address::from_string(CommArg::comm_arg().command_bind_ip )), CommArg::comm_arg().command_bind_port) )
-	, use_tcp_(use_tcp)
+void CommandRecvService::send( const boost::asio::mutable_buffers_1 & buffer )
 {
+	sock_.send_to(buffer, server_);
+}
+
+CommandRecvService::CommandRecvService()
+	: io_()
+	, client_(CLIENT_SOCK_FILE)
+	, server_(SERVER_SOCK_FILE)
+	, sender_()
+	, sock_( io_, datagram_protocol() )
+{
+	unlink(CLIENT_SOCK_FILE);
+	sock_.bind(client_);
 }
 
 void CommandRecvService::command_execute_loop()
@@ -44,46 +79,24 @@ void CommandRecvService::run()
 			);
 	t.detach();
 
-	if (use_tcp_)
+	DCSPPacket pkt;
+	U08 * bytes = (U08 *)&pkt;
+
+	while (!end())
 	{
-		tcp::socket sock(io_);
-		acceptor_.accept( sock );
-		tcp::endpoint e = sock.remote_endpoint();
-		FDU_LOG(INFO) << "CommandRecvService: accept remote " << e;
-		while (!end())
+		boost::system::error_code ec;
+		size_t length = sock_.receive_from(boost::asio::buffer(bytes, sizeof(DCSPPacket)), sender_);	// block
+		if (length > 0)
 		{
-			u_char buff[1500];
-			boost::system::error_code ec;
-			size_t length = sock.read_some(boost::asio::buffer(buff), ec);	// block
-			if (ec)
+			pkt.do_ntoh();
+			CommArg::comm_arg().pdss_id = pkt.src_id;		// record PDSS_ID
+			CommArg::comm_arg().mainode_id = pkt.snk_id;	// record MAINODE_ID
+			U16 msg_len = pkt.msg_len;
+			if (msg_len != length - 16)
 			{
-				FDU_LOG(ERR) << "error read data from " << e;
-				continue;
+				FDU_LOG(WARN) << "message length not match: " << msg_len << " wanted is " << length - 16;
 			}
-			// TODO
-			// add src_code sink_code judgement
-			if (CommandPtr c = make_command(buff, length))
-			{
-				Server::instance().command_queue()->put( c );
-			}
-		}
-	}
-	else
-	{
-		ASSERT (dcsp_fifo_init(1) >= 0, "dcsp init error");
-		while (!end())
-		{
-			static const unsigned SIZE = 1500;
-			u_char buff[SIZE];
-			int length = dcsp_fifo_read((char *)buff, SIZE);	// block
-			if (length < 0)
-			{
-				FDU_LOG(ERR) << "error read data from dcsp fifo";
-				continue;
-			}
-			// TODO
-			// add src_code sink_code judgement
-			if (CommandPtr c = make_command(buff, length))
+			if (CommandPtr c = make_command(pkt.msg, msg_len, pkt.msg_id))
 			{
 				Server::instance().command_queue()->put( c );
 			}
@@ -91,82 +104,53 @@ void CommandRecvService::run()
 	}
 }
 
-CommandPtr CommandRecvService::make_command(u_char * buff, size_t length)
+CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsigned msg_id)
 {
-	const unsigned num_head_bytes = /*use_tcp_ ? 1 + 1 + 4 + 4 :*/ 4 + 4;
-	const unsigned num_msg_info   = 2 + 2 + 2;
-
-	u_char * p = buff + num_head_bytes;
-	unsigned short msg_type   = ntohs(cast<unsigned short>(p)); p += sizeof(unsigned short);
-	unsigned short msg_code   = ntohs(cast<unsigned short>(p)); p += sizeof(unsigned short);
-	unsigned short msg_length = ntohs(cast<unsigned short>(p)); p += sizeof(unsigned short);
-
-	u_char * msg_contents = p;
-	unsigned msg_key = (msg_type << 16) + msg_code;
-	if (msg_length != length - num_head_bytes - num_msg_info)
-		FDU_LOG(WARN) << "message length not matched";
-
-	Command::CMDTYPE ctype;
 	CommandPtr c;
 
-	switch (msg_key)
+	switch (msg_id)
 	{
-		case MSG_START_MAIN_NODE:	// start run
+		case MSG_CREATE_DOMAIN:	// load config
 			{
-				ctype = Command::START_MAIN_NODE;
-				c = CommandPtr(new Command( ctype ));
-			}
-			break;
-		case MSG_CONFIG_MAIN_NODE:	// load config
-			{
-				ctype = Command::CONFIG_MAIN_NODE;
-				c = CommandPtr(new Command( ctype ));
-				c->set_config_bytes(vector<u_char>(msg_contents, msg_contents + 6));	// magic number need confirm
-				unsigned num_ip = ntohs( cast<unsigned short>(buff + num_head_bytes + num_msg_info + 6) );
-				if (num_ip * sizeof(unsigned) != msg_length - 8)
-					FDU_LOG(WARN) << "ip contents length not matched";
-				unsigned * pip = (unsigned *)(buff + num_head_bytes + num_msg_info + 8);
-				for (unsigned i = 0; i < num_ip; i++)
-				{
-					c->add_target_node(udp::endpoint(
-								ip::address::from_string(Command::unsigned_to_string(ntohl(pip[i]))), CommArg::comm_arg().fpga_port
-								));
-				}
+				if (length != sizeof(DomainInfo))
+					FDU_LOG(WARN) << "domain info size not match";
+				DomainInfo * d = new DomainInfo;
+				memcpy( d, msg, sizeof(DomainInfo));
+				c = CommandPtr( new DomainCreateCommand(DomainInfoPtr(d)) );
 			}
 			break;
 		case MSG_ADD_NODES:	// add node
-		case MSG_DEL_NODES:	// del node
 			{
-				ctype = msg_key == MSG_ADD_NODES ? Command::ADD_NODES : Command::DEL_NODES;
-				c = CommandPtr(new Command( ctype ));
-				unsigned num_ip = 1;
-				unsigned * pip = (unsigned *)(p);
-				for (unsigned i = 0; i < num_ip; i++)
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				U16 num_node = ntohs(cast<U16>(msg)); msg += sizeof(U16);
+				if (length != num_node * 4 + 12)
+					FDU_LOG(ERR) << "length not match in MSG_ADD_NODES";
+				AddNodesCommand * cmd = new AddNodesCommand(d);
+				U32 * nodes = (U32 *)msg;
+				for (int i = 0; i < num_node; i++)
 				{
-					c->add_target_node(udp::endpoint(
-								ip::address::from_string(Command::unsigned_to_string(ntohl(pip[i]))), CommArg::comm_arg().fpga_port
-								));
+					cmd->add_target_node(nodes[i]);
 				}
+				c = CommandPtr(cmd);
 			}
-///*{{{*/
-//			{
-//				ctype = msg_key == MSG_ADD_NODES ? Command::ADD_NODES : Command::DEL_NODES;
-//				c = CommandPtr(new Command( ctype ));
-//				unsigned num_ip = cast<unsigned short>(p); p += sizeof(unsigned short);
-//				if (num_ip * sizeof(unsigned) + sizeof(unsigned short) != msg_length)
-//					FDU_LOG(WARN) << "ip contents length not matched";
-//				unsigned * pip = (unsigned *)(p);
-//				for (unsigned i = 0; i < num_ip; i++)
-//				{
-//					c->add_target_node(udp::endpoint(
-//								ip::address::from_string(Command::unsigned_to_string(pip[i])), CommArg::comm_arg().fpga_port
-//								));
-//				}
-//			}
-///*}}}*/
+			break;
+		case MSG_DEL_NODES:	// add node
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				U16 num_node = ntohs(cast<U16>(msg)); msg += sizeof(U16);
+				if (length != num_node * 4 + 12)
+					FDU_LOG(ERR) << "length not match in MSG_ADD_NODES";
+				RemoveNodesCommand * cmd = new RemoveNodesCommand(d);
+				U32 * nodes = (U32 *)msg;
+				for (int i = 0; i < num_node; i++)
+				{
+					cmd->add_target_node(nodes[i]);
+				}
+				c = CommandPtr(cmd);
+			}
 			break;
 		default:
-			FDU_LOG(ERR) << boost::format("unknown message key: %08x, skip this message") % msg_key;
+			FDU_LOG(ERR) << boost::format("unknown message key: %08x, skip this message") % msg_id;
 			break;
 	}
 	return c;
