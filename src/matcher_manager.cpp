@@ -358,11 +358,22 @@ const std::string MatcherManager::id_to_ip(unsigned id)
 	NodeId nodeid;
 	memcpy(&nodeid, &id, sizeof(NodeId));
 
-	string head = "172.22.";
-	U08 X = nodeid.row_id * 5 + nodeid.col_id + 1;
-	U08 Y = (nodeid.module_id + 1) * 10 + nodeid.unit_id;
+	string head;
+	U08 X, Y;
+
+	if (nodeid.row_id == 0)
+	{	// PC node
+		head = "10.1.";
+		X = nodeid.row_id * 5 + nodeid.col_id + 1;
+		Y = nodeid.module_id + 1;
+	}
+	else
+	{	// FPGA node
+		head = "172.22.";
+		X = nodeid.row_id * 5 + nodeid.col_id + 1;
+		Y = (nodeid.module_id + 1) * 10 + nodeid.unit_id;
+	}
 	return head +
 		boost::lexical_cast<string>(X) + '.' +
 		boost::lexical_cast<string>(Y);
-
 }
