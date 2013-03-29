@@ -17,6 +17,7 @@ struct CommArg : boost::noncopyable
 	std::string    bind_ip;
 	std::vector<std::string> images;
 	std::vector<std::string> videos;
+	std::vector<std::string> sources;
 	std::vector<std::string> libs;
 	std::vector<std::string> image_libs;
 	std::vector<std::string> client_addrs;
@@ -78,6 +79,12 @@ struct CommArg : boost::noncopyable
 	// module id
 	unsigned mainode_id;
 	unsigned pdss_id;
+
+	//---------------------------------------------------------------------------------- 
+	// source data control
+	unsigned packet_pause;
+	unsigned group_pause;
+	int use_packet_pause;
 
 	//---------------------------------------------------------------------------------------
 	// static

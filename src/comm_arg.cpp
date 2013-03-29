@@ -49,12 +49,19 @@ bool CommArg::parse_info_file( const char * file )
 	command_bind_ip = pt.get<std::string>("command_bind_ip");
 	debug = pt.get<int>("debug");
 
+	//---------------------------------------------------------------------------------- 
+	group_pause = pt.get<unsigned>("group_pause", 10000);
+	packet_pause = pt.get<unsigned>("packet_pause", 3000);
+	use_packet_pause = pt.get<unsigned>("use_packet_pause", 1);
+
 	foreach (ptree::value_type &v, pt.get_child("libs"))
 		libs.push_back(v.second.get_value<string>());
-	foreach (ptree::value_type &v, pt.get_child("videos"))
-		videos.push_back(v.second.get_value<string>());
-	foreach (ptree::value_type &v, pt.get_child("images"))
-		images.push_back(v.second.get_value<string>());
+//	foreach (ptree::value_type &v, pt.get_child("videos"))
+//		videos.push_back(v.second.get_value<string>());
+//	foreach (ptree::value_type &v, pt.get_child("images"))
+//		images.push_back(v.second.get_value<string>());
+	foreach (ptree::value_type &v, pt.get_child("sources"))
+		sources.push_back(v.second.get_value<string>());
 
 	ASSERT(bind_ip.size(), "bind ip empty");
 	ASSERT(command_bind_ip.size(), "command bind ip empty");

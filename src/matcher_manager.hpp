@@ -14,17 +14,107 @@
 #include <boost/timer/timer.hpp>
 #include <boost/thread/condition.hpp>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+
 typedef boost::asio::ip::address ip_address;
 
 class Matcher;
 class MatcherManager;
 struct DomainInfo;
+struct AppId;
 
+typedef AppId DomainType;
 typedef boost::shared_ptr<DomainInfo> DomainInfoPtr;
 typedef boost::shared_ptr< Matcher > MatcherPtr;
 
-typedef std::map<unsigned short, DomainInfoPtr> DomainMap;
+typedef std::map<DomainType, DomainInfoPtr> DomainMap;
 
+struct AppId
+{
+	U16 DomainId;
+	U64 TimeStamp;
+
+	std::string to_string() const {
+		using namespace boost::posix_time;
+		using namespace boost::gregorian;
+		time_duration td = milliseconds(TimeStamp);
+		date d(1970, Jan, 1);
+		ptime pt(d, td);
+		return std::string("App-") + boost::lexical_cast<string>(DomainId) + "-" + to_simple_string(pt);
+	}
+} __attribute__((packed));
+
+bool operator < (const AppId & lhs, const AppId & rhs);
+bool operator == (const AppId & lhs, const AppId & rhs);
+std::ostream & operator << (std::ostream & os, const AppId & appid);
+
+struct DomainInfo
+{
+	U08 PacketType;
+	U08 PacketIndex;
+	U16 PacketLength;
+	AppId ApplicationId;
+
+	U32 PresentationId;
+	U32 TerminalId;
+	U32 MonitorId;
+	U32 LoadBalanceId;
+
+	U32 LeftNeighborId;
+	U32 RightNeighborId;
+
+	U32 HighLoadThreshold;
+	U16 LowLoadThreshold;
+	U16 BalanceThreshold;
+
+	U16 DCSPTimeout;
+	U16 CommTimeout;
+	U08 OutputTimeout;
+	U08 ReportCycle;
+
+	U08 NBits;
+	U08 MergeUnit;
+	U08 SliceLen;
+	U08 MatchThreshold;
+	U08 MergeThreshold;
+	U08 ReMergeThrehold;
+
+	U16 LibId;
+	U16 StructInfo;
+	U16 NodeVersion;
+
+	U16 NodeFrequency;
+	U32 SpeedPerPipe;
+	U16 BasicPower;
+	U08 PowerPerPipe;
+	U08 NumTotalPipe;
+
+	static DomainInfoPtr find_domain_by_id(DomainType id)
+	{
+		DomainMap::iterator it = domains.find(id);
+		if (it != domains.end())
+			return it->second;
+		return DomainInfoPtr();
+	}
+
+	static bool add_domain(DomainInfoPtr pd)
+	{
+		return domains.insert(std::make_pair(pd->ApplicationId, pd)).second;
+	}
+
+	static DomainInfoPtr make_domain(char * pc)
+	{
+		DomainInfoPtr pd( new DomainInfo );
+		memcpy(pd.get(), pc, sizeof(DomainInfo));
+		return pd;
+	}
+
+	static DomainMap domains;	// public
+
+} __attribute__ ((packed)) ;
+
+//---------------------------------------------------------------------------------- 
 class Matcher
 {
 
@@ -48,7 +138,7 @@ public:
 	};
 
 //	Matcher ( const endpoint_type & e, unsigned nbits, unsigned merge_unit );
-	Matcher ( const endpoint_type & e, unsigned short d );
+	Matcher ( const endpoint_type & e, DomainType d );
 	Matcher ( const endpoint_type & e );
 
 	const endpoint_type to_endpoint() const { return endpoint_; }
@@ -73,8 +163,15 @@ public:
 	void increase_load(unsigned n) { num_load_ += n; } 
 	void set_num_load(unsigned num);
 
-	unsigned short domain_id() const { return domain_id_; }
-	void set_domain_id(unsigned short d) { domain_id_ = d; }
+	DomainType domain_id() const { return domain_id_; }
+	void set_domain_id(DomainType d) { domain_id_ = d; }
+
+	bool first_flag() const { return first_flag_; }
+	void demark_first_flag() { first_flag_ = false; }
+
+	U08 result_count() const { return result_count_; }
+	void increse_result_count() { ++result_count_; }
+	void clear_result_count() { result_count_ = 0; }
 
 private:
 
@@ -86,76 +183,12 @@ private:
 	unsigned merge_unit_;
 	unsigned match_threshold_;
 	unsigned merge_threshold_;
-	unsigned short domain_id_;
+	DomainType domain_id_;
+
+	bool first_flag_;
+	U08 result_count_;
 
 };
-
-struct AppId
-{
-	U16 DomainId;
-	U64 TimeStamp;
-} __attribute__((packed));
-
-struct DomainInfo
-{
-	U08 PacketType;
-	U08 PacketIndex;
-	U16 PacketLength;
-	AppId ApplicationId;
-
-	U32 PresentationId;
-	U32 TerminalId;
-	U32 MonitorId;
-
-	U32 HighLoadThreshold;
-	U16 LowLoadThreshold;
-	U16 BalanceThreshold;
-
-	U16 DCSPTimeout;
-	U16 CommTimeout;
-	U08 OutputTimeout;
-	U08 ReportCycle;
-
-	U08 NBits;
-	U08 MergeUnit;
-	U08 SectionLen;
-	U08 MatchThreshold;
-	U08 MergeThreshold;
-	U08 ReMergeThrehold;
-
-	U16 LibId;
-	U16 StructInfo;
-	U16 NodeVersion;
-
-	U16 NodeFrequency;
-	U32 SpeedPerPipe;
-	U16 BasicPower;
-	U08 PowerPerPipe;
-	U08 NumTotalPipe;
-
-	static DomainInfoPtr find_domain_by_id(unsigned short id)
-	{
-		DomainMap::iterator it = domains.find(id);
-		if (it != domains.end())
-			return it->second;
-		return DomainInfoPtr();
-	}
-
-	static bool add_domain(DomainInfoPtr pd)
-	{
-		return domains.insert(std::make_pair(pd->ApplicationId.DomainId, pd)).second;
-	}
-
-	static DomainInfoPtr make_domain(char * pc)
-	{
-		DomainInfoPtr pd( new DomainInfo );
-		memcpy(pd.get(), pc, sizeof(DomainInfo));
-		return pd;
-	}
-
-	static DomainMap domains;	// public
-
-} __attribute__ ((packed)) ;
 
 class MatcherManager
 {
@@ -190,9 +223,9 @@ public:
 
 	void print_matchers     (std::ostream & out) const;
 
-	static MatcherPtr make_matcher( const Matcher::endpoint_type & e, unsigned short domain_id )
+	static MatcherPtr make_matcher( const Matcher::endpoint_type & e, DomainType domain_id )
 	{ return MatcherPtr( new Matcher(e, domain_id) ); }
-	static MatcherPtr make_matcher( const std::string & ip, unsigned short domain_id )
+	static MatcherPtr make_matcher( const std::string & ip, DomainType domain_id )
 	{ return make_matcher( Matcher::endpoint_type(ip_address::from_string(ip), CommArg::comm_arg().fpga_port), domain_id ); }
 
 	void connect_matcher( const Matcher & m );
@@ -200,10 +233,10 @@ public:
 
 	MatcherPtr find( const Matcher & m ) const;
 	MatcherPtr find_one_matcher_at_state( Matcher::MATCHER_STATE s );
-	MatcherPtr find_one_matcher_at_domain_and_state( const Matcher::MATCHER_STATE s, unsigned short d );
+	MatcherPtr find_one_matcher_at_domain_and_state( const Matcher::MATCHER_STATE s, DomainType d );
 	Matchers find_matchers_at_state( Matcher::MATCHER_STATE s );
-	Matchers find_matchers_at_domain( unsigned short d );
-	Matchers find_matchers_at_domain_and_state( unsigned short d, Matcher::MATCHER_STATE s );
+	Matchers find_matchers_at_domain( DomainType d );
+	Matchers find_matchers_at_domain_and_state( DomainType d, Matcher::MATCHER_STATE s );
 
 	static MatcherPtr find_in( const Matcher & m, const Matchers & ms )
 	{
@@ -223,7 +256,7 @@ public:
 
 	/// need load balance
 	/// @return 
-	MatcherPtr choose_next_matcher_for_domain(unsigned short d);
+	MatcherPtr choose_next_matcher_for_domain(DomainType d);
 	MatcherPtr choose_next_matcher();
 
 	void notify_wait_ready_matcher();

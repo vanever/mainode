@@ -11,19 +11,18 @@
 
 #include "match_utils.h"
 #include "log.h"
-
 #include "utils.h"
 
 using namespace std;
 using namespace boost;
-
-int THREADS = 12;
 
 // 2月3日聚合方法重要变化：FPGA增加了输入数据缓冲，这使得输出结果的顺序难以控制
 // 新方案FPGA每批做31位聚合，CPU对结果计数即可，不需再做拼接
 // 代码中仍保留拼接功能，输出结果更好看些
 
 MatchArgs ARGS;
+
+int THREADS = 6;
 
 void MatchArgs::load(const string& arg_file) {
 	using namespace boost::property_tree;
@@ -32,13 +31,28 @@ void MatchArgs::load(const string& arg_file) {
 
 	feature_bits   = pt.get<int>("feature_bits", 32);
 	frame_thres    = pt.get<int>("frame_thres", 1);
-//	sequence_thres = pt.get<int>("sequence_thres", 0);
 	min_match_len  = pt.get<int>("min_match_len", 8);
-//	max_skip       = pt.get<int>("max_skip", 0);
 	batch_len      = pt.get<int>("batch_len", 32);
 	overlap_len    = pt.get<int>("overlap_len", 0);
-//	diag_test_bits = pt.get<int>("diag_test_bits", 3);
 	diag_test_thres= pt.get<int>("diag_test_thres", 20);
+}
+
+static const int min_acc = 1, max_acc = 4;
+static const int min_cnv = 1, max_cnv = 4;
+static const int args_table[][4] = {
+	{ 32, 64, 128, 128 },	// 0: feature_bits
+	{ 8, 16, 32, 32 }		// 1: batch_len
+};
+
+void MatchArgs::set_accuracy(int a) {
+	if (a < min_acc || a > max_acc)
+		FDU_LOG(ERR) << "set_accuracy: wrong accuracy: " << a;
+	else feature_bits = args_table[0][a - min_acc];
+}
+void MatchArgs::set_converge(int c) {
+	if (c < min_cnv || c > max_cnv)
+		FDU_LOG(ERR) << "set_converge: wrong converge: " << c;
+	else batch_len = args_table[1][c - min_cnv];
 }
 
 // =====================================================================================
@@ -178,8 +192,8 @@ void SectionManager::add_section(const MatchSection& sec) {
 	Chain& ch = chains_[sec.offset_id()];
 	
 	// 使用反向迭代器可同时得到待插入位置两侧的元素
-	Chain::reverse_iterator rp = find_if(ch.rbegin(), ch.rend(), boost::bind(::less, _1, boost::ref(sec)));
-	Chain::iterator p = rp.base();
+	auto rp = find_if(ch.rbegin(), ch.rend(), boost::bind(::less, _1, boost::ref(sec)));
+	auto p = rp.base();
 
 	if (rp != ch.rend() && sec_dist(sec, *rp) <= 0) {
 //		FDU_LOG(DEBUG) << "merge left";
@@ -206,7 +220,7 @@ void SectionManager::add_section(const MatchSection& sec) {
 
 const MatchResults& SectionManager::gather_results() {
 	 results_.clear();
-	for (ChainMap::const_iterator p = chains_.begin(); p != chains_.end(); ++p) {
+	for (auto p = chains_.cbegin(); p != chains_.cend(); ++p) {
 		int test_id = (p->first >> 32) & 0xffff;
 		foreach (const MatchSection& sec, p->second) {
 			if (sec.len >= ARGS.min_match_len)
@@ -216,10 +230,10 @@ const MatchResults& SectionManager::gather_results() {
 	return results_;
 }
 
-void SectionManager::output_chains(ostream& out, int video_id) {
+void SectionManager::output_chains(ostream& out, int test_id) {
 	int ns = 0;
-	ChainMap::iterator p = chains_.lower_bound((long long)video_id << 32);
-	for (; p != chains_.end() && ((p->first >> 32) & 0xffff) == video_id; ++p) {
+	auto p = chains_.lower_bound((long long)test_id << 32);
+	for (; p != chains_.end() && ((p->first >> 32) & 0xffff) == test_id; ++p) {
 		foreach (const MatchSection& sec, p->second) {
 			if (sec.len < ARGS.min_match_len) continue;
 			out << "section "<< ++ns << " \t Length: " << sec.len << endl;
@@ -230,10 +244,37 @@ void SectionManager::output_chains(ostream& out, int video_id) {
 }
 
 void SectionManager::delete_chains(int test_id) {
-	ChainMap::iterator beg = chains_.lower_bound((long long)test_id << 32);
+	auto beg = chains_.lower_bound((long long)test_id << 32);
 	if (beg == chains_.end()) return;
-	ChainMap::iterator end = chains_.lower_bound((long long)(test_id + 1) << 32);
+	auto end = chains_.lower_bound((long long)(test_id + 1) << 32);
 	chains_.erase(beg, end);
+}
+
+// ----------------------
+
+void SectionManagerSimp::add_section(const MatchSection& sec) {
+	FDU_LOG(DEBUG) << "add_section: test_pos = " <<sec.video_id() <<":" << sec.slice_id() << ":" << sec.test_pos()
+				   << " lib_pos = " << sec.lib_id() << ":" << sec.lib_pos();
+	++results_[sec.offset_id()];
+}
+
+void SectionManagerSimp::output_results(ostream& out, int test_id) {
+	test_id &= 0xfffff;
+	auto end = results_.lower_bound((long long)(test_id + 1) << 32);
+	for (auto p = results_.lower_bound((long long)test_id << 32); p != end; ++p) {
+		if (p->second < slice_thres_) continue;
+		MatchSection sec(test_id << 12, p->first & 0xffffffff);
+		out << "VideotoMatch " << sec.video_id() <<":" << sec.slice_id() << endl;
+		out << "LibVideo " << sec.lib_id() << ":" << sec.lib_pos() << endl;
+	}
+}
+
+void SectionManagerSimp::delete_results(int test_id) {
+	test_id &= 0xfffff;
+	auto beg = results_.lower_bound((long long)test_id << 32);
+	if (beg == results_.end()) return;
+	auto end = results_.lower_bound((long long)(test_id + 1) << 32);
+	results_.erase(beg, end);
 }
 
 // =====================================================================================

@@ -8,9 +8,45 @@ namespace DCSP {
 	const unsigned MSG_ADD_NODES        = 0x00010010;
 	const unsigned MSG_DEL_NODES        = 0x00010011;
 	const unsigned MSG_TELL_LOADS       = 0x00010024;
-	const unsigned MSG_CREATE_DOMAIN    = 0x00010034;
+	const unsigned MSG_CREATE_DOMAIN    = 0x00010005;
+	const unsigned MSG_REPLY            = 0x0001006F;
+	const unsigned MSG_OMC_REQ          = 0x00010002;
+
+	const unsigned MSG_QUERY_LOADS      = 0x00020042;
+	const unsigned MSG_REPORT_LOADS     = 0x00020043;
 
 }
+
+struct DCSPPacket
+{
+	U32 src_id;
+	U32 snk_id;
+	U32 msg_id;
+	U16 msg_len;
+	u_char msg[1500];
+
+	void do_ntoh() {
+		src_id  = ntohl(src_id);
+		snk_id  = ntohl(snk_id);
+		msg_id  = ntohl(msg_id);
+		msg_len = ntohs(msg_len);
+	}
+
+	void do_hton() {
+		src_id  = htonl(src_id);
+		snk_id  = htonl(snk_id);
+		msg_id  = htonl(msg_id);
+		msg_len = htons(msg_len);
+	}
+
+	const boost::asio::mutable_buffers_1 to_buffer()
+	{
+		auto ret = boost::asio::buffer((U08 *)this, 14 + msg_len);
+		do_hton();
+		return ret;
+	}
+
+} __attribute__((packed));
 
 /// interface class
 class ICommand
@@ -19,7 +55,7 @@ class ICommand
 public:
 
 	virtual void execute() = 0;
-	virtual void reply  ();
+	virtual void reply  (unsigned msg_key = DCSP::MSG_REPLY);
 
 	static const std::string unsigned_to_string (unsigned u);
 
@@ -63,8 +99,8 @@ public:
 
 	typedef std::set<unsigned> Nodes;
 
-	RemoveNodesCommand(AppId id)
-		: app_id_(id)
+	RemoveNodesCommand(/*AppId id*/)
+		: app_id_{0,0}		// C++11风格初始化
 	{
 	}
 
@@ -108,13 +144,31 @@ class QueryLoadsCommand : public ICommand
 
 public:
 
-	// TODO
+	QueryLoadsCommand(AppId appid);
 
-	virtual void execute() {}
-	virtual void reply  () {}
+	virtual void execute();
+	virtual void reply  ();
 
 private:
 
+	AppId appid_;
+
+};
+
+//---------------------------------------------------------------------------------- 
+class ShowResultCommand : public ICommand
+{
+
+public:
+
+	ShowResultCommand(AppId appid);
+
+	virtual void execute();
+	virtual void reply  ();
+
+private:
+
+	AppId appid_;
 
 };
 

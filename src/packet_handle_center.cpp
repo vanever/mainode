@@ -2,6 +2,7 @@
 #include "server.hpp"
 #include "connection_build_service.hpp"
 #include "match_stream.hpp"
+#include "app_manager.hpp"
 
 using namespace std;
 
@@ -71,7 +72,13 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 	else if (type == BITFEATURE_TYPE + 1 || type == (BITFEATURE_TYPE | 0x10) + 1)
 	{
 		PACKET_MSG(DEBUG, length, end_point, type, index, "bitfeature response");
-		Server::instance().bitfeature_window()->confirm( index - 1 );
+		if (MatcherPtr m = MatcherManager::instance().find(end_point))
+		{
+			if (AppDomainPtr papp = AppManager::instance().get_domain_by_appid(m->domain_id()))
+			{
+				papp->window()->confirm( index - 1 );
+			}
+		}
 		unsigned stock_data = *(unsigned*)p->data_ptr();
 		FDU_LOG(INFO) << "stock_data = " << ntohl(stock_data);
 	}

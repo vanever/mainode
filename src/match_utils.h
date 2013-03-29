@@ -14,15 +14,17 @@
 struct MatchArgs {
 	int feature_bits;		// 特征精度
 	int frame_thres;		// 单帧匹配阈值
-//	int sequence_thres;		// 用于匹配段的合并。该参数对拼接算法影响太大，因此取消
 	int min_match_len;		// 最小连续匹配帧数阈值
-//	int max_skip;			// 可跳过的连续不匹配帧数。在新方案中无效
-	int batch_len;		// 每组匹配帧数
+	int batch_len;			// 每组匹配帧数
 	int overlap_len;		// 相邻两组间重叠帧数
-//	int diag_test_bits;		// 每组匹配结果（对角线）判断位数。在新方案中无效
 	int diag_test_thres;	// 每组匹配结果判断阈值
+	
+	int slice_len;			// 再聚合视频长度
+	int slice_thres;		// 再聚合阈值
 
 	void load(const string& arg_file);
+	void set_accuracy(int a);
+	void set_converge(int c);
 };
 
 extern MatchArgs ARGS;
@@ -74,9 +76,11 @@ struct MatchSection {
 	int len;
 	MatchSection(int tb = 0, int lb = 0, int ln = 0) :
 		test_begin(tb), lib_begin(lb), len(ln) {}
-	int test_id() const { return test_begin >> 16; }	// 含视频号和片段号
-	int lib_id()  const { return lib_begin  >> 16; }
-	int test_pos() const { return test_begin & 0xffff; }
+	int test_id()  const { return (test_begin >> 12) & 0xfffff; }	// 含视频号和片段号
+	int video_id() const { return test_id()  >> 10; }
+	int slice_id() const { return test_id()  & 0x3ff; }
+	int lib_id()   const { return (lib_begin >> 16) & 0xffff;  }
+	int test_pos() const { return test_begin & 0xfff;  }
 	int lib_pos()  const { return lib_begin  & 0xffff; }
 	long long offset_id()  const {
 		return ((long long)test_id() << 32) | ((long long)lib_id() << 16)
@@ -105,20 +109,33 @@ typedef std::set<MatchResult> MatchResults;
 class SectionManager {
 public:
 	typedef std::list<MatchSection> Chain;		// 有序链表
-	typedef std::map<long long, Chain> ChainMap;
 
 	void add_section(const MatchSection& sec);
 
 	const MatchResults& gather_results();
 	const MatchResults& results() const { return results_; }
 
-	void output_chains(std::ostream& os, int test_id);
+	void output_chains(std::ostream& os, int test_id);	// test_id为待测视频编号（帧编号前20位）
 	void delete_chains(int test_id);
 	void clear() { chains_.clear(); }
 
 private:
 	std::map<long long, Chain> chains_;			// 使用offset_id作为key
 	MatchResults results_;
+};
+
+class SectionManagerSimp {
+public:
+	SectionManagerSimp(int thres) : slice_thres_(thres) {}
+	void add_section(const MatchSection& sec);
+
+	void output_results(std::ostream& os, int test_id);	// test_id为待测视频编号（帧编号前20位）
+	void delete_results(int test_id);
+	void clear() { results_.clear(); }
+
+private:
+	int slice_thres_;
+	std::map<long long, int> results_;			// 使用offset_id作为key
 };
 
 class VideoMatcher {

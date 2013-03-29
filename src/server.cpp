@@ -26,43 +26,12 @@ Server * Server::server_ = 0;
 
 void Server::start()
 {
-	//! prepare video lib, fixed in runtime
-	ASSERTS(arg()->lib_id < arg()->libs.size());
-	const std::string & libpath = CommArg::comm_arg().libs[arg()->lib_id];
-	if (CommArg::comm_arg().libs.size() != 1)
-	{
-		FDU_LOG(ERR) << "only one lib supported, please use \"cat\" or other method to merge your lib first";
-	}
-	{
-		boost::timer::cpu_timer c;
-		LibLoadService::instance().load_lib_to_mem( libpath );
-		FDU_LOG(INFO) << "time load lib to mem: " << c.format();
-	}
-
-//	foreach (const std::string & addr, this->arg()->client_addrs)
-//	{	// if any, add matchers
-//		MatcherPtr m =
-//			MatcherManager::instance().make_matcher(udp::endpoint( addr_type::from_string(addr), arg()->fpga_port ));
-//		m->set_merge_unit( CommArg::comm_arg().merge_unit );
-//		m->set_nbits( CommArg::comm_arg().nbits );
-//		MatcherManager::instance().add_matcher( m );
-//	}
-
-	//! running match streamline
-	boost::timer::cpu_timer cmatch;
-	start_match_stream();
-	FDU_LOG(INFO) << "time match: " << cmatch.format();
-
-	//! TODO: show match result
 }
 
 void Server::start_main()
 {
 	open_services();
-	if (CommArg::comm_arg().debug == 1)
-	{
-		start();
-	}
+	io_.run();	// start IO
 }
 
 void Server::open_services()
@@ -96,29 +65,29 @@ void Server::open_services()
 	t4.detach();
 }
 
-void Server::start_match_stream()
-{
-	StreamLine line;
+// void Server::start_match_stream()
+// {
+//     StreamLine line;
+// 
+//     bitfeature_loader_ = new BitFeatureLoader();
+//     bitfeature_sender_ = new BitFeatureSender();
+//     line.add_node( bitfeature_loader_ );
+//     line.add_node( bitfeature_sender_ );
+// 
+//     //! start streamline
+//     FDU_LOG(INFO) << "-- START match stream";
+//     line.start_running_stream();
+// 
+//     //! start IO operation
+//     io_.run();
+// 
+//     //! wait streamline to end
+//     line.wait_stream_end();
+//     FDU_LOG(INFO) << "-- END match stream";
+//     io_.reset();
+// }
 
-	bitfeature_loader_ = new BitFeatureLoader();
-	bitfeature_sender_ = new BitFeatureSender();
-	line.add_node( bitfeature_loader_ );
-	line.add_node( bitfeature_sender_ );
-
-	//! start streamline
-	FDU_LOG(INFO) << "-- START match stream";
-	line.start_running_stream();
-
-	//! start IO operation
-	io_.run();
-
-	//! wait streamline to end
-	line.wait_stream_end();
-	FDU_LOG(INFO) << "-- END match stream";
-	io_.reset();
-}
-
-void Server::recv_diverse_handler(const error_code& ec, size_t length)
+void Server::recv_diverse_handler(const boost::system::error_code& ec, size_t length)
 {
 	if (ec)
 	{
@@ -132,13 +101,13 @@ void Server::recv_diverse_handler(const error_code& ec, size_t length)
 	}
 
 //	disable filter
-//	if ( !MatcherManager::instance().exists(end_point_) )
-//	{	// filter 
-//		FDU_LOG(DEBUG) << "filter packet from " << end_point_;
-//		socket_.async_receive_from(recv_buffer_, end_point_,
-//				boost::bind(&Server::recv_diverse_handler, this, _1, _2));
-//		return;
-//	}
+	if ( !MatcherManager::instance().exists(end_point_) )
+	{	// filter 
+		FDU_LOG(DEBUG) << "filter packet from " << end_point_;
+		socket_.async_receive_from(recv_buffer_, end_point_,
+				boost::bind(&Server::recv_diverse_handler, this, _1, _2));
+		return;
+	}
 
 	recv_pkt_.set_total_len( length + UDP_HEAD_SIZE );	// need confirm
 	recv_pkt_.set_from_point(end_point_);
@@ -148,9 +117,9 @@ void Server::recv_diverse_handler(const error_code& ec, size_t length)
 			boost::bind(&Server::recv_diverse_handler, this, _1, _2));
 }
 
-void dummy_handler(const error_code& ) {}
+void dummy_handler(const boost::system::error_code& ) {}
 
-void Server::send_handler(const error_code& ec, size_t length)
+void Server::send_handler(const boost::system::error_code& ec, size_t length)
 {
 	if (ec) {
 		ASSERT(0, ec.message());
@@ -216,6 +185,7 @@ void Server::mark_all_comm_end()
 	all_comm_end_ = true;
 	packet_queue()->notify_all_put();
 	command_queue()->notify_all_put();
+	command_window()->notify_all_put();
 	ConnectionBuilderService::instance().notify_wait_matcher();
 	LibLoadService::instance().notify_wait_matcher();
 	CommandRecvService::instance().stop_io_service();

@@ -173,4 +173,18 @@ public:
 
 };
 
+typedef PacketWindow<16> command_window_base__;
+
+class CommandWindow : public command_window_base__
+{
+
+public:
+
+	explicit CommandWindow(int timeout = 100)
+		: command_window_base__("CommandWindow", timeout)
+	{
+	}
+
+};
+
 #endif

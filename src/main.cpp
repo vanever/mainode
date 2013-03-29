@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 
 		Server::construct_server( &CommArg::comm_arg() );
 		Server::instance().start_main();
-		Server::instance().wait_all_end();
+//		Server::instance().wait_all_end();
 		cout << "time all: " << c.format() << endl;
 
 #ifdef EXCEPTION_HANDLE

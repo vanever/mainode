@@ -28,6 +28,7 @@
 #include "matcher_manager.hpp"
 #include <fstream>
 #include "lib_load_service.hpp"
+#include "app_manager.hpp"
 
 class Server;
 
@@ -103,7 +104,7 @@ class NewLibLoader : public StreamNode
 
 public:
 
-	NewLibLoader ();
+	NewLibLoader (const VideoLibVec & lib);
 
 	virtual void do_run_task ();
 	virtual void do_end_task ();
@@ -111,6 +112,7 @@ public:
 private:
 
 	void load_lib( const VideoLibVec & file );
+	const VideoLibVec & lib_;
 
 };
 
@@ -189,7 +191,7 @@ class BitFeatureLoader : public StreamNode
 
 public:
 
-	BitFeatureLoader();
+	BitFeatureLoader(AppDomainPtr app);
 
 	virtual void do_run_task ();
 	virtual void do_end_task ();
@@ -197,12 +199,10 @@ public:
 private:
 
 	void load_loop(const VideoLibVec & videos);
-	void load_section(unsigned short vid, unsigned short frompos, const BitFeature * bit_vec, unsigned size, MatcherPtr matcher);
-
-	// TODO
-	// support multi-video
+	void load_section(unsigned short vid, unsigned short frompos, const BitFeature * bit_vec, unsigned size, MatcherPtr matcher, unsigned slice_idx);
 
 	std::size_t image_cnt_;
+	AppDomainPtr app_;
 	VideoLibVec vec_;
 
 };
@@ -212,19 +212,23 @@ class BitFeatureSender : public StreamNode
 
 public:
 
-	BitFeatureSender () {}
+	BitFeatureSender (AppDomainPtr);
 
 	virtual void do_run_task ();
 	virtual void do_end_task ();
 
 	void set_dest_addr( const endpoint & addr );
 	const endpoint dest_addr() const;
+	void update_pause_time(unsigned v);
+	unsigned pause_time() const { return paused_time_; }
 
 private:
 
 	void send_packets_loop();
 
+	AppDomainPtr app_;
 	endpoint dest_addr_;
+	unsigned paused_time_;
 
 };
 

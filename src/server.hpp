@@ -11,7 +11,6 @@
 #include "matcher_manager.hpp"
 #include <boost/foreach.hpp>
 
-using boost::system::error_code;
 using boost::asio::ip::udp;
 using namespace boost::asio;
 typedef boost::asio::ip::address addr_type;
@@ -86,7 +85,7 @@ public:
 	//! send handler for all async_send_to
 	//! @param   ec
 	//! @param   length
-	void send_handler(const error_code& ec, size_t length);
+	void send_handler(const boost::system::error_code& ec, size_t length);
 
 	static Server & instance()
 	{
@@ -117,6 +116,7 @@ public:
 	CommandQueue       * command_queue()       { return &cmd_queue_; }
 	SurfLibWindow      * surf_lib_window()     { return &surf_lib_window_; }	
 	BitFeatureWindow   * bitfeature_window()   { return &bitfeature_window_; }
+	CommandWindow      * command_window()      { return &command_window_; }
 
 	BitFeatureLoader   * bitfeature_loader()   const { return bitfeature_loader_; }
 	BitFeatureSender   * bitfeature_sender()   const { return bitfeature_sender_; }
@@ -126,7 +126,7 @@ private:
 	//! trying receive all kinds of response or data after sending the first image
 	//! @param   ec
 	//! @param   length
-	void recv_diverse_handler(const error_code& ec, size_t length);
+	void recv_diverse_handler(const boost::system::error_code& ec, size_t length);
 
 	//----------------------------------------------------------------------------
 	// basic
@@ -155,6 +155,7 @@ private:
 
 	SurfLibWindow         surf_lib_window_;				// window for sending surf lib points
 	BitFeatureWindow      bitfeature_window_;			// window for sending bitfeature
+	CommandWindow         command_window_;				// window for sending msg to DCSP
 
 	//----------------------------------------------------------------------------
 	// stream node

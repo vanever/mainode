@@ -20,6 +20,23 @@ namespace {
 	}
 }
 
+bool operator < (const AppId & lhs, const AppId & rhs)
+{
+	return lhs.DomainId < rhs.DomainId ||
+		(lhs.DomainId == rhs.DomainId && lhs.TimeStamp < rhs.TimeStamp);
+}
+
+bool operator == (const AppId & lhs, const AppId & rhs)
+{
+	return lhs.DomainId == rhs.DomainId && lhs.TimeStamp == rhs.TimeStamp;
+}
+
+std::ostream & operator << (std::ostream & os, const AppId & appid)
+{
+	os << appid.to_string();
+	return os;
+}
+
 //--------------------------------------------------------------------------------------- 
 
 // Matcher::Matcher ( const endpoint_type & e, unsigned nbits, unsigned merge_unit )
@@ -36,26 +53,30 @@ Matcher::Matcher ( const endpoint_type & e )
 	: state_( UNCONNECTED )
 	, endpoint_( e )
 	, num_load_( 0 )
-	, domain_id_( 0 )
+	, domain_id_(   )
+	, first_flag_(true)
+	, result_count_(0)
 {
 }
 
-Matcher::Matcher ( const endpoint_type & e, unsigned short d )
+Matcher::Matcher ( const endpoint_type & e, DomainType d )
 	: state_( UNCONNECTED )
 	, endpoint_( e )
 	, num_load_( 0 )
-	, domain_id_( 0 )
+	, domain_id_(   )
+	, first_flag_(true)
+	, result_count_(0)
 {
 	if (DomainInfoPtr pd = DomainInfo::find_domain_by_id(d))
 	{
 		set_domain_id(d);
-		set_nbits(pd->NBits);
-		set_merge_unit(pd->MergeUnit);
+		set_nbits(pd->NBits << 5);
+		set_merge_unit(pd->MergeUnit << 3);
 //		set_match_threshold(d->MatchThreshold);
 //		set_merge_threshold(d->MergeThreshold);
 	}
 	else
-		FDU_LOG(ERR) << "Unknown domain id " << d;
+		FDU_LOG(ERR) << "Unknown domain id " << d.DomainId;
 }
 
 // bool operator < (MatcherPtr lhs, MatcherPtr rhs)
@@ -217,7 +238,7 @@ void MatcherManager::start_timer()
 /// need fix
 /// @param domain
 /// @return 
-MatcherPtr MatcherManager::choose_next_matcher_for_domain(unsigned short domain)
+MatcherPtr MatcherManager::choose_next_matcher_for_domain(DomainType domain)
 {
 	lock lk(monitor_);
 	while ( !find_one_matcher_at_domain_and_state(Matcher::READY, domain) )
@@ -232,7 +253,7 @@ MatcherPtr MatcherManager::choose_next_matcher_for_domain(unsigned short domain)
 		thres = pd->BalanceThreshold;	// domain thres
 	}
 	else
-		FDU_LOG(WARN) << __func__ << " not valid domain id: " << domain;
+		FDU_LOG(WARN) << __func__ << " not valid domain id: " << domain.DomainId;
 
 	Matchers ms(find_matchers_at_domain_and_state(domain, Matcher::READY));
 	std::sort(ms.begin(), ms.end(), boost::bind(load_compare, _1, _2, thres));
@@ -268,7 +289,7 @@ MatcherManager::Matchers MatcherManager::find_matchers_at_state( Matcher::MATCHE
 	return ms;
 }
 
-MatcherManager::Matchers MatcherManager::find_matchers_at_domain_and_state( unsigned short d, Matcher::MATCHER_STATE s )
+MatcherManager::Matchers MatcherManager::find_matchers_at_domain_and_state( DomainType d, Matcher::MATCHER_STATE s )
 {
 	Matchers ms;
 	foreach ( MatcherPtr m, matchers_ )
@@ -281,7 +302,7 @@ MatcherManager::Matchers MatcherManager::find_matchers_at_domain_and_state( unsi
 	return ms;
 }
 
-MatcherManager::Matchers MatcherManager::find_matchers_at_domain( unsigned short d )
+MatcherManager::Matchers MatcherManager::find_matchers_at_domain( DomainType d )
 {
 	Matchers ms;
 	foreach ( MatcherPtr m, matchers_ )
@@ -312,7 +333,7 @@ MatcherPtr MatcherManager::find_one_matcher_at_state( const Matcher::MATCHER_STA
 	return MatcherPtr();
 }
 
-MatcherPtr MatcherManager::find_one_matcher_at_domain_and_state( const Matcher::MATCHER_STATE s, unsigned short d )
+MatcherPtr MatcherManager::find_one_matcher_at_domain_and_state( const Matcher::MATCHER_STATE s, DomainType d )
 {
 	foreach ( MatcherPtr m, matchers_ )
 	{
@@ -346,26 +367,35 @@ const std::string MatcherManager::id_to_ip(unsigned id)
 {
 	struct NodeId
 	{
-		unsigned row_id    : 5;
-		unsigned col_id    : 5;
-		unsigned module_id : 5;
-		unsigned unit_id   : 7;
 		unsigned device_id : 10;
-	} __attribute__((packed));
+		unsigned unit_id   : 3;
+		unsigned unit_type : 4;
+		unsigned module_id : 5;
+		unsigned col_id    : 5;
+		unsigned row_id    : 5;
+	};
 
 	ASSERTSD(sizeof(NodeId) == sizeof(unsigned));
 
 	NodeId nodeid;
 	memcpy(&nodeid, &id, sizeof(NodeId));
 
+	FDU_LOG(DEBUG) << "id_to_ip: id = " << hex << id << dec
+			<< " row = " << nodeid.row_id << " col = " << nodeid.col_id
+			<< " mod = " << nodeid.module_id << " type = " << nodeid.unit_type
+			<< " unit = " << nodeid.unit_id << " dev = " << nodeid.device_id;
 	string head;
-	U08 X, Y;
+	U16 X, Y;
 
 	if (nodeid.row_id == 0)
 	{	// PC node
-		head = "10.1.";
-		X = nodeid.row_id * 5 + nodeid.col_id + 1;
-		Y = nodeid.module_id + 1;
+//		head = "10.1.";
+//		X = nodeid.row_id * 5 + nodeid.col_id + 1;
+//		Y = nodeid.module_id + 1;
+		head = "192.168.";
+		X = 100;
+		Y = (nodeid.col_id + 1) * 10 + nodeid.module_id + 1;
+		if (nodeid.module_id > 8) Y += 90;
 	}
 	else
 	{	// FPGA node

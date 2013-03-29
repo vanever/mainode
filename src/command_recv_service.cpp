@@ -16,21 +16,7 @@ namespace {
 	}
 }
 
-struct DCSPPacket
-{
-	U32 src_id;
-	U32 snk_id;
-	U32 msg_id;
-	U16 msg_len;
-	u_char msg[1500];
-	void do_ntoh() {
-		src_id  = ntohl(src_id);
-		snk_id  = ntohl(snk_id);
-		msg_id  = ntohl(msg_id);
-		msg_len = ntohs(msg_len);
-	}
-} __attribute__((packed));
-
+const unsigned MSG_SHOW_APP_RESULT = 0x00000070;
 
 CommandRecvService & CommandRecvService::instance()
 {
@@ -71,6 +57,15 @@ void CommandRecvService::command_execute_loop()
 	}
 }
 
+void CommandRecvService::send_packets_loop()
+{
+	CommandWindow * window = Server::instance().command_window();
+	while (Packet * pkt = window->get())
+	{
+		send(pkt->to_udp_buffer());
+	}
+}
+
 void CommandRecvService::run()
 {
 	//! open command executing
@@ -78,6 +73,10 @@ void CommandRecvService::run()
 			boost::bind(&CommandRecvService::command_execute_loop, this)
 			);
 	t.detach();
+	boost::thread t2(
+			boost::bind(&CommandRecvService::send_packets_loop, this)
+			);
+	t2.detach();
 
 	DCSPPacket pkt;
 	U08 * bytes = (U08 *)&pkt;
@@ -92,9 +91,9 @@ void CommandRecvService::run()
 			CommArg::comm_arg().pdss_id = pkt.src_id;		// record PDSS_ID
 			CommArg::comm_arg().mainode_id = pkt.snk_id;	// record MAINODE_ID
 			U16 msg_len = pkt.msg_len;
-			if (msg_len != length - 16)
+			if (msg_len != length - 14)
 			{
-				FDU_LOG(WARN) << "message length not match: " << msg_len << " wanted is " << length - 16;
+				FDU_LOG(WARN) << "message length not match: " << msg_len << " wanted is " << length - 14;
 			}
 			if (CommandPtr c = make_command(pkt.msg, msg_len, pkt.msg_id))
 			{
@@ -122,8 +121,8 @@ CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsig
 		case MSG_ADD_NODES:	// add node
 			{
 				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
-				U16 num_node = ntohs(cast<U16>(msg)); msg += sizeof(U16);
-				if (length != num_node * 4 + 12)
+				U32 num_node = ntohl(cast<U32>(msg)); msg += sizeof(U32);
+				if (length != num_node * 4 + 14)
 					FDU_LOG(ERR) << "length not match in MSG_ADD_NODES";
 				AddNodesCommand * cmd = new AddNodesCommand(d);
 				U32 * nodes = (U32 *)msg;
@@ -136,16 +135,30 @@ CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsig
 			break;
 		case MSG_DEL_NODES:	// add node
 			{
-				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
-				U16 num_node = ntohs(cast<U16>(msg)); msg += sizeof(U16);
-				if (length != num_node * 4 + 12)
+				//AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				U32 num_node = ntohl(cast<U32>(msg)); msg += sizeof(U32);
+				if (length != num_node * 4 + 4)
 					FDU_LOG(ERR) << "length not match in MSG_ADD_NODES";
-				RemoveNodesCommand * cmd = new RemoveNodesCommand(d);
+				RemoveNodesCommand * cmd = new RemoveNodesCommand(/*d*/);
 				U32 * nodes = (U32 *)msg;
 				for (int i = 0; i < num_node; i++)
 				{
 					cmd->add_target_node(nodes[i]);
 				}
+				c = CommandPtr(cmd);
+			}
+			break;
+		case MSG_SHOW_APP_RESULT:	// show result
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				ShowResultCommand * cmd = new ShowResultCommand(d);
+				c = CommandPtr(cmd);
+			}
+			break;
+		case MSG_QUERY_LOADS:	// show result
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				QueryLoadsCommand * cmd = new QueryLoadsCommand(d);
 				c = CommandPtr(cmd);
 			}
 			break;

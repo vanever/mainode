@@ -14,6 +14,8 @@ class LibLoadService
 public:
 
 	typedef boost::mutex::scoped_lock lock;
+	typedef DomainType AppId;
+	typedef std::map<DomainType, VideoLibVec> LibMap;
 
 	void run();
 
@@ -25,23 +27,20 @@ public:
 		return c;
 	}
 
-	const VideoLibVec & video_lib()
-	{
-		ASSERT(lib_valid_, "lib not ready");
-		return video_lib_;
-	}
-
-	void load_lib_to_mem(const std::string & path);
+	void load_domain_lib_to_mem(DomainType d);
 
 private:
 
 	LibLoadService();
+
 	LibLoadService(const LibLoadService &);
+
 	bool end();
-	void load_lib_to_matcher( MatcherPtr m );
+	void load_lib_to_matcher( MatcherPtr m, const VideoLibVec & lib );
+	void load_lib_to_mem(const std::string & path, VideoLibVec & lib);
 
 	bool lib_valid_;
-	VideoLibVec video_lib_;
+	LibMap libmap_;
 	boost::mutex monitor_;
 	boost::condition c_wait_;
 
