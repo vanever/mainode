@@ -250,13 +250,24 @@ MatcherPtr MatcherManager::choose_next_matcher_for_domain(DomainType domain)
 	unsigned short thres = CommArg::comm_arg().balance_threshold;	// default
 	if (DomainInfoPtr pd = DomainInfo::find_domain_by_id(domain))
 	{
-		thres = pd->BalanceThreshold;	// domain thres
+		thres = ntohs(pd->BalanceThreshold);	// domain thres
 	}
 	else
 		FDU_LOG(WARN) << __func__ << " not valid domain id: " << domain.DomainId;
 
+	FDU_LOG(DEBUG) << "use balance threshold: " << thres;
 	Matchers ms(find_matchers_at_domain_and_state(domain, Matcher::READY));
+
+	FDU_LOG(DEBUG) << "before sort: ";
+	foreach (MatcherPtr m, ms)
+		FDU_LOG(DEBUG) << "\t" << m->to_endpoint();
+	
 	std::sort(ms.begin(), ms.end(), boost::bind(load_compare, _1, _2, thres));
+
+	FDU_LOG(DEBUG) << "after sort: ";
+	foreach (MatcherPtr m, ms)
+		FDU_LOG(DEBUG) << "\t" << m->to_endpoint();
+
 	FDU_LOG(DEBUG) << "BitFeatureLoader choose " << (ms[0])->to_endpoint();
 	return ms[0];
 }

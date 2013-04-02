@@ -156,7 +156,7 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 		}
 		else
 		{
-			PACKET_MSG(DEBUG, length, end_point, type, index, "lib response");
+			// PACKET_MSG(DEBUG, length, end_point, type, index, "lib response");
 			if (window->confirm(index - 1))
 			{
 				if ( !(++num_responses_lib % 10000) )

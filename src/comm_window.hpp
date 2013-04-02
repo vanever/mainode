@@ -173,18 +173,74 @@ public:
 
 };
 
-typedef PacketWindow<16> command_window_base__;
-
-class CommandWindow : public command_window_base__
+class CommandWindow : public Basebox
 {
 
 public:
 
-	explicit CommandWindow(int timeout = 100)
-		: command_window_base__("CommandWindow", timeout)
+	CommandWindow(int timeout = 100)
+		: TIMEOUT(timeout)
+		, data_valid(false)
+		, need_confirmed(false)
+		, confirmed(false)
 	{
+		FDU_LOG(DEBUG) << "CommandWindow constructed";
 	}
 
+	virtual bool put_condition_not_satisfied() { return box_full() || (need_confirmed && !confirmed); }
+
+	DCSPPacketPtr get()
+	{
+		lock lk(monitor);
+		while (get_condition_not_satisfied())
+		{
+			if ( end_condition_satisfied() )
+			{	// read end
+				return DCSPPacketPtr();
+			}
+			if (!c_get.timed_wait(lk, boost::posix_time::milliseconds(TIMEOUT)) && (need_confirmed && !confirmed))
+			{
+				FDU_LOG(WARN) << "DCSP Packet timeout";
+				data_valid = true;	// re-send
+			}
+		}
+		data_valid = false;
+		c_put.notify_one();
+		return data;
+	}
+
+	void put(DCSPPacketPtr t, bool consider_timeout = true)
+	{
+		lock lk(monitor);
+		while (put_condition_not_satisfied())
+		{
+			c_put.wait(lk);
+		}
+		data = t;
+		data_valid = true;
+		if (!consider_timeout)
+			need_confirmed = false;
+		c_get.notify_one();
+	}
+
+	void mark_confirmed()
+	{
+		confirmed = true;
+		c_put.notify_one();
+	}
+
+	virtual std::size_t num_elements() const { return data_valid ? 1 : 0; }
+	virtual std::size_t capacity()     const { return 1; }
+
+protected:
+
+	DCSPPacketPtr data;
+	const int TIMEOUT;
+	bool data_valid;
+	bool need_confirmed;
+	bool confirmed;
+
 };
+
 
 #endif

@@ -102,7 +102,7 @@ public:
 		lock lk(monitor);
 		while (get_condition_not_satisfied())
 		{
-			if ( end_condition_not_satisfied() == false )
+			if ( end_condition_satisfied() )
 			{	// read end
 				return false;
 			}

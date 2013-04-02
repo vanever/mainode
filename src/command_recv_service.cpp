@@ -60,9 +60,9 @@ void CommandRecvService::command_execute_loop()
 void CommandRecvService::send_packets_loop()
 {
 	CommandWindow * window = Server::instance().command_window();
-	while (Packet * pkt = window->get())
+	while (DCSPPacketPtr pkt = window->get())
 	{
-		send(pkt->to_udp_buffer());
+		send(pkt->to_buffer());
 	}
 }
 

@@ -17,6 +17,9 @@ namespace DCSP {
 
 }
 
+struct DCSPPacket;
+typedef boost::shared_ptr<DCSPPacket> DCSPPacketPtr;
+
 struct DCSPPacket
 {
 	U32 src_id;
@@ -46,6 +49,8 @@ struct DCSPPacket
 		return ret;
 	}
 
+	DCSPPacketPtr make_dcsp_packet(const DCSPPacket & p) { return DCSPPacketPtr(new DCSPPacket(p)); }
+
 } __attribute__((packed));
 
 /// interface class
@@ -55,7 +60,8 @@ class ICommand
 public:
 
 	virtual void execute() = 0;
-	virtual void reply  (unsigned msg_key = DCSP::MSG_REPLY);
+	virtual void reply  () = 0;
+	static void do_reply(unsigned msg_key = DCSP::MSG_REPLY);
 
 	static const std::string unsigned_to_string (unsigned u);
 

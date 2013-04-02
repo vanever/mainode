@@ -46,6 +46,7 @@ public:
 
 		, surf_lib_window_     ()
 		, bitfeature_window_   ()
+		, command_window_      ()
 
         , bitfeature_loader_   ( 0 )
         , bitfeature_sender_   ( 0 )

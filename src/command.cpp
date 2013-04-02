@@ -47,7 +47,7 @@ const std::string ICommand::unsigned_to_string(unsigned ip)
 		u_char_to_decimal_string(c4) ;
 }
 
-void ICommand::reply(unsigned msg_key)
+void ICommand::do_reply(unsigned msg_key)
 {
 //	U08 buff[4 + 4 + 6];
 	struct ResponInfo {
@@ -64,6 +64,7 @@ void ICommand::reply(unsigned msg_key)
 	CommandRecvService::instance().send(
 			boost::asio::mutable_buffers_1(&r, sizeof(ResponInfo))
 			);
+	FDU_LOG(INFO) << boost::format(" reply key 0x%08x") % msg_key;
 }
 
 //---------------------------------------------------------------------------------- 
@@ -85,7 +86,7 @@ void AddNodesCommand::execute()
 
 void AddNodesCommand::reply()
 {
-	ICommand::reply();
+	ICommand::do_reply();
 }
 
 //---------------------------------------------------------------------------------- 
@@ -106,7 +107,7 @@ void RemoveNodesCommand::execute()
 
 void RemoveNodesCommand::reply()
 {
-	ICommand::reply();
+	ICommand::do_reply();
 }
 
 
@@ -126,8 +127,8 @@ void DomainCreateCommand::execute()
 void DomainCreateCommand::reply()
 {
 	// DCSP要求先发送一个OMC请求消息，以触发DCSP Agent更新ID/IP对照表
-	ICommand::reply(MSG_OMC_REQ);
-	ICommand::reply();
+	ICommand::do_reply(MSG_OMC_REQ);
+	ICommand::do_reply();
 }
 
 //---------------------------------------------------------------------------------- 
@@ -146,7 +147,7 @@ void ShowResultCommand::execute()
 
 void ShowResultCommand::reply()
 {
-	ICommand::reply();
+	ICommand::do_reply();
 }
 
 //---------------------------------------------------------------------------------- 
@@ -165,6 +166,10 @@ void QueryLoadsCommand::reply()
 	if (AppDomainPtr papp = AppManager::instance().get_domain_by_appid(appid_))
 	{
 		DCSPPacket pkt;
+		pkt.src_id  = CommArg::comm_arg().mainode_id;
+		pkt.snk_id  = CommArg::comm_arg().pdss_id;
+		pkt.msg_id  = MSG_REPORT_LOADS;
+		pkt.msg_len = 26;
 		unsigned num_sent      = papp->sent_frames();
 		unsigned num_unhandled = papp->unhandled_frames();
 		unsigned source_gen_speed = (papp->domain_info_ptr()->SliceLen * 60) * 1000 / papp->bitfeature_sender()->pause_time();
