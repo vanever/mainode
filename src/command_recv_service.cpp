@@ -1,6 +1,5 @@
 #include "command_recv_service.hpp"
 #include "server.hpp"
-#include "dcsp_fifo.h"
 
 #define SERVER_SOCK_FILE "/tmp/DCSP_FIFO_A_SOCK"
 #define CLIENT_SOCK_FILE "/tmp/DCSP_FIFO_B_SOCK"

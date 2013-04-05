@@ -38,7 +38,8 @@ struct AppId
 	std::string to_string() const {
 		using namespace boost::posix_time;
 		using namespace boost::gregorian;
-		time_duration td = milliseconds(TimeStamp);
+		U64 timestamp = (htonl((TimeStamp & 0xFFFFFFFF)) << 32) | htonl(TimeStamp >> 32);
+		time_duration td = milliseconds(timestamp);
 		date d(1970, Jan, 1);
 		ptime pt(d, td);
 		return std::string("App-") + boost::lexical_cast<string>(DomainId) + "-" + to_simple_string(pt);
@@ -262,15 +263,13 @@ public:
 	void notify_wait_ready_matcher();
 
 	void update_all_matcher_load();
+	void update_all_matcher_load(unsigned elapsed_time);
 
 	void start_timer();
 
 private:
 
-	MatcherManager()
-	{
-		timer_.stop();
-	}
+	MatcherManager();
 
 	void add_matcher( MatcherPtr m, Matchers & ms );
 	void print_matcher_util( std::ostream & out, const Matchers & ms ) const;

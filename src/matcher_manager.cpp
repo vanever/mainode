@@ -3,6 +3,7 @@
 #include "lib_load_service.hpp"
 #include "server.hpp"
 #include <boost/lexical_cast.hpp>
+#include "mini_timer.hpp"
 
 using namespace std;
 
@@ -229,6 +230,19 @@ void MatcherManager::update_all_matcher_load()
 	}
 }
 
+void MatcherManager::update_all_matcher_load(unsigned elapsed_time)
+{
+	lock lk(monitor_);
+	unsigned reduced = (double(elapsed_time) / 1000.0) * CommArg::comm_arg().node_speed;
+	Matchers ms(find_matchers_at_state(Matcher::READY));
+	foreach (MatcherPtr m, ms)
+	{
+		m->set_num_load(
+				m->num_load() > reduced ? (m->num_load() - reduced) : 0
+				);
+	}
+}
+
 void MatcherManager::start_timer()
 {
 	lock lk(monitor_);
@@ -260,13 +274,13 @@ MatcherPtr MatcherManager::choose_next_matcher_for_domain(DomainType domain)
 
 	FDU_LOG(DEBUG) << "before sort: ";
 	foreach (MatcherPtr m, ms)
-		FDU_LOG(DEBUG) << "\t" << m->to_endpoint();
+		FDU_LOG(DEBUG) << "\t" << m->to_endpoint() << ": " << m->num_load();
 	
 	std::sort(ms.begin(), ms.end(), boost::bind(load_compare, _1, _2, thres));
 
 	FDU_LOG(DEBUG) << "after sort: ";
 	foreach (MatcherPtr m, ms)
-		FDU_LOG(DEBUG) << "\t" << m->to_endpoint();
+		FDU_LOG(DEBUG) << "\t" << m->to_endpoint() << ": " << m->num_load();
 
 	FDU_LOG(DEBUG) << "BitFeatureLoader choose " << (ms[0])->to_endpoint();
 	return ms[0];
@@ -417,4 +431,13 @@ const std::string MatcherManager::id_to_ip(unsigned id)
 	return head +
 		boost::lexical_cast<string>(X) + '.' +
 		boost::lexical_cast<string>(Y);
+}
+
+MatcherManager::MatcherManager()
+{
+	timer_.stop();
+	MiniTimer::instance().add_period_task(
+			CommArg::comm_arg().load_update_interval,
+			boost::bind(&MatcherManager::update_all_matcher_load, this, CommArg::comm_arg().load_update_interval)
+			);
 }

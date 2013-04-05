@@ -31,7 +31,21 @@ void LibLoadService::load_domain_lib_to_mem(DomainType d)
 
 void LibLoadService::load_lib_to_mem(const std::string & path, VideoLibVec & lib)
 {
-	loadLibNew(CommArg::comm_arg().nbits, lib, path);
+	unsigned nbits = CommArg::comm_arg().nbits;
+	loadLibNew(nbits, lib, path);
+
+	// add a dummy rec with code = 0 && contents = 0
+	// it's used for judging whether the result should be calculated
+	VideoLibRec rec;
+	rec.video_num = 0x00000000;
+	rec.num_of_frames = 32;	// max merge unit
+	for (int i = 0; i < rec.num_of_frames; i++)
+	{
+		BitFeature bf(nbits);
+		bf.clear();
+		rec.point_vec.push_back(bf);
+	}
+	lib.push_back( rec );
 }
 
 void LibLoadService::load_lib_to_matcher( MatcherPtr m, const VideoLibVec & lib )

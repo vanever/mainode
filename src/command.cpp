@@ -172,7 +172,17 @@ void QueryLoadsCommand::reply()
 		pkt.msg_len = 26;
 		unsigned num_sent      = papp->sent_frames();
 		unsigned num_unhandled = papp->unhandled_frames();
-		unsigned source_gen_speed = (papp->domain_info_ptr()->SliceLen * 60) * 1000 / papp->bitfeature_sender()->pause_time();
+		unsigned pause_time    = papp->bitfeature_sender()->pause_time();
+		unsigned source_gen_speed;
+		if (pause_time == 0)
+		{
+			FDU_LOG(INFO) << "pause_time is zero, use max speed";
+			source_gen_speed = CommArg::comm_arg().max_send_speed;
+		}
+		else
+		{
+			source_gen_speed = (papp->domain_info_ptr()->SliceLen * 60) * 1000 / pause_time;
+		}
 		u_char * p = pkt.msg;
 		cast<AppId>(p) = papp->appid(); p += sizeof(AppId);
 		cast<U32>(p) = htonl(source_gen_speed); p += sizeof(U32);

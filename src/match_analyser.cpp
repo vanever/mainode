@@ -55,10 +55,16 @@ void MatchAnalyser::handle_packet( Packet & pkt, const udp::endpoint & from_addr
 		unsigned tb = (p[cnt++]);
 //		unsigned lb = ntohl(p[cnt++]);
 //		unsigned tb = ntohl(p[cnt++]);
-		if (lb || tb)
+		if (lb)
 			papp->add_section( MatchSection(tb, lb, papp->domain_info_ptr()->MergeUnit) );
+		else if (tb)
+		{	// output condition
+			papp->output_result(std::cout, tb >> 12);
+		}
 		else
+		{
 			FDU_LOG(INFO) << "skip all 0 64bit";
+		}
 	}
 }
 

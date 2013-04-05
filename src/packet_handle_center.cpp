@@ -12,9 +12,10 @@ using namespace std;
 #define PACKET_MSG(LOG_TYPE, length, endpoint, type, index, MSG_TYPE) \
 	do { \
 		FDU_LOG(LOG_TYPE) << "--------- " << MSG_TYPE << " ---------"; \
-		FDU_LOG(LOG_TYPE) << "--- length:" << length << "\n" << endpoint; \
-		FDU_LOG(LOG_TYPE) << "--- type:" << boost::format("0x%02x") % (int)type; \
-		FDU_LOG(LOG_TYPE) << "--- index:" << (int)index; \
+		FDU_LOG(LOG_TYPE) << "--- from: " << endpoint; \
+		FDU_LOG(LOG_TYPE) << "--- length: " << length \
+						  << "  type: " << boost::format("0x%02x") % (int)type \
+						  << "  index: " << (int)index; \
 	} while (0)
 #endif
 

@@ -15,6 +15,7 @@
 #include "lib_load_service.hpp"
 #include "packet_handle_center.hpp"
 #include "command_recv_service.hpp"
+#include "mini_timer.hpp"
 
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
@@ -64,28 +65,6 @@ void Server::open_services()
 			);
 	t4.detach();
 }
-
-// void Server::start_match_stream()
-// {
-//     StreamLine line;
-// 
-//     bitfeature_loader_ = new BitFeatureLoader();
-//     bitfeature_sender_ = new BitFeatureSender();
-//     line.add_node( bitfeature_loader_ );
-//     line.add_node( bitfeature_sender_ );
-// 
-//     //! start streamline
-//     FDU_LOG(INFO) << "-- START match stream";
-//     line.start_running_stream();
-// 
-//     //! start IO operation
-//     io_.run();
-// 
-//     //! wait streamline to end
-//     line.wait_stream_end();
-//     FDU_LOG(INFO) << "-- END match stream";
-//     io_.reset();
-// }
 
 void Server::recv_diverse_handler(const boost::system::error_code& ec, size_t length)
 {
@@ -190,5 +169,6 @@ void Server::mark_all_comm_end()
 	LibLoadService::instance().notify_wait_matcher();
 	CommandRecvService::instance().stop_io_service();
 	io_.stop(); // stop receive handler
+	MiniTimer::instance().stop();
 	c_wait_.notify_one();
 }

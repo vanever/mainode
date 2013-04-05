@@ -15,10 +15,13 @@ class AppDomain : public boost::noncopyable
 
 public:
 
+	~AppDomain();
+
 	const AppId appid() const { return appid_; }
 	BitFeatureWindow * window() { return &window_; }
 
 	void output_result(std::ostream & out);
+	void output_result(std::ostream & out, unsigned testid);
 	void output_result(const std::string & path);
 
 	void add_testid(unsigned testid) { testid_set_.insert(testid); }
@@ -44,6 +47,8 @@ private:
 
 	void set_loader(BitFeatureLoader * p) { loader_ = p; }
 	void set_sender(BitFeatureSender * p) { sender_ = p; }
+
+	void trigger_run();
 
 	AppId appid_;
 	BitFeatureLoader * loader_;
@@ -92,7 +97,6 @@ private:
 
 	AppManager() {}
 
-	void create_app_threads(AppDomainPtr pa);
 	AppDomainMap domains_;
 
 };

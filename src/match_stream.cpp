@@ -15,6 +15,8 @@
 #include "comm_window.hpp"
 
 #include "app_manager.hpp"
+#include "mini_timer.hpp"
+#include "speed_manager.hpp"
 
 using namespace std;
 using boost::asio::ip::udp;
@@ -154,9 +156,9 @@ void NewLibSender::send_packets()
 	static size_t cnt = 0;
 	while (pkt = window->get())
 	{ 
-		FDU_LOG(DEBUG) << "lib sender -> send packet: " << cnt << "th";
+//		FDU_LOG(DEBUG) << "lib sender -> send packet: " << cnt << "th";
 		Server::instance().send( pkt->to_udp_buffer(), dest_ );
-		if (!(++cnt % 10000))
+		if (!(++cnt % 1000))
 		{
 			FDU_LOG(INFO) << "send packets: " << cnt;
 		}
@@ -255,7 +257,7 @@ void ConnectionBuilder::set_built(bool b)
 //--------------------------------------------------------------------------------------- 
 //
 
-BitFeatureLoader::BitFeatureLoader (AppDomainPtr app)
+BitFeatureLoader::BitFeatureLoader (AppDomain * app)
 	: image_cnt_(0)
 	, app_(app)
 {
@@ -272,9 +274,9 @@ void BitFeatureLoader::do_run_task()
 void BitFeatureLoader::do_end_task()
 {
 	app_->window()->notify_all_put();
-	FDU_LOG(INFO) << "\n---------------------------------------\n"
-	              << "-- BitFeatureLoader quit\n"
-	              << "---------------------------------------";
+	FDU_LOG(INFO) << "\n---------------------------------------"
+	              << "\n-- BitFeatureLoader quit"
+	              << "\n---------------------------------------";
 }
 
 void BitFeatureLoader::load_loop(const VideoLibVec & videos)
@@ -286,8 +288,8 @@ void BitFeatureLoader::load_loop(const VideoLibVec & videos)
 
 	foreach (const VideoLibRec & rec, videos)
 	{
-//		int framegroup_size = CommArg::comm_arg().framegroup_size;
-		int framegroup_size = app_->domain_info_ptr()->SliceLen * 60;
+//		unsigned framegroup_size = CommArg::comm_arg().framegroup_size;
+		unsigned framegroup_size = app_->domain_info_ptr()->SliceLen * 60;
 		unsigned num_of_frames = rec.num_of_frames;
 		unsigned short vid = rec.video_num;
 		unsigned short pos = 0;
@@ -295,14 +297,15 @@ void BitFeatureLoader::load_loop(const VideoLibVec & videos)
 		while (num_of_frames > framegroup_size)
 		{
 			MatcherPtr node = MatcherManager::instance().choose_next_matcher_for_domain(appid);
-			MatcherManager::instance().start_timer();
+//			MatcherManager::instance().start_timer();
+//			vector<BitFeature> features(&rec.point_vec[pos], &rec.point_vec[pos + framegroup_size]);
 			load_section(vid, pos, &rec.point_vec[pos], framegroup_size, node, num_slice);
 			unsigned testid = (vid << 10) + num_slice;
 			app_->add_testid(testid);
 			num_slice++;
 			window->wait_until_box_empty();		// must
 			node->increase_load( framegroup_size );
-			MatcherManager::instance().update_all_matcher_load();	// will stop timer
+//			MatcherManager::instance().update_all_matcher_load();	// will stop timer
 
 			num_of_frames -= framegroup_size;
 			pos           += framegroup_size;
@@ -341,7 +344,6 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 
 	static u_char idx = 0;
 	unsigned cnt = 0;
-	unsigned slicepos = 0;
 	Packet * pkt = window->acquire();
 	pkt->set_info(
 			matcher->first_flag() ? (BITFEATURE_TYPE | 0x10) : BITFEATURE_TYPE,
@@ -377,7 +379,7 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 		if (i + merge_unit > sent_size)
 			break;	// check for skip condition
 
-		ASSERTS(max_data_len / sizeof(unsigned) - cnt >= 32);
+		ASSERTS(max_data_len / sizeof(unsigned) - cnt >= 8);
 		memset(p + cnt, 0xFF, 20);
 		cnt += 20 / sizeof(unsigned);
 		p[cnt++] = SYNCWORD;
@@ -411,6 +413,41 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 
 	}
 
+	//---------------------------------------------------------------------------------- 
+	// add a merge unit with 0 values
+	ASSERTS(max_data_len / sizeof(unsigned) - cnt >= 8);
+	memset(p + cnt, 0xFF, 20);
+	cnt += 20 / sizeof(unsigned);
+	p[cnt++] = SYNCWORD;
+	p[cnt++] = (vid << 22) + (slice_idx << 12);
+	p[cnt]   = 0; cast<u_char>(p + cnt) = merge_unit; cnt++;	// add merge unit word
+
+	if (cnt == max_data_len / sizeof(unsigned))
+	{											
+		window->put();                       	
+		pkt = window->acquire();             	
+		pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+		p = (unsigned *)pkt->data_ptr();         
+		cnt = 0;                              
+	}											
+
+	unsigned nwords = matcher->nbits() >> 5;
+	for (unsigned j = 0; j < merge_unit; j++)
+	{
+		for (unsigned k = 0; k < nwords; k++)
+			p[cnt++] = 0;
+		if (cnt == max_data_len / sizeof(unsigned))	
+		{
+			window->put();                       	
+			pkt = window->acquire();             	
+			pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+			p = (unsigned *)pkt->data_ptr();         
+			cnt = 0;                              
+		}
+	}
+	// end add
+	//---------------------------------------------------------------------------------- 
+
 	if (cnt > 0)
 	{	// last packet
 		pkt->set_data_len( cnt * sizeof(unsigned) );
@@ -423,9 +460,32 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 	}
 }
 
-BitFeatureSender::BitFeatureSender(AppDomainPtr app)
+BitFeatureSender::BitFeatureSender(AppDomain * app)
 	: app_(app)
+	, speed_manager_(0)
+	, paused_time_(CommArg::comm_arg().packet_pause)
+	, last_task_id_(0)
 {
+	unsigned idx = app->domain_info_ptr()->LibId;
+	if ( idx < CommArg::comm_arg().speed_files.size() )
+	{
+		speed_manager_ = new SpeedManager(CommArg::comm_arg().speed_files[idx].c_str());
+	}
+	else
+	{
+		speed_manager_ = new SpeedManager;
+	}
+	last_task_id_ = MiniTimer::instance().add_period_task(
+			speed_manager_->original_interval(),
+			boost::bind(&BitFeatureSender::update_pause_time, this)
+			);
+}
+
+BitFeatureSender::~BitFeatureSender()
+{
+	if (speed_manager_)
+		delete speed_manager_;
+	MiniTimer::instance().remove_period_task(last_task_id_);
 }
 
 void BitFeatureSender::do_run_task()
@@ -469,8 +529,13 @@ void BitFeatureSender::set_dest_addr( const endpoint & addr )
 	dest_addr_ = addr;
 }
 
-void BitFeatureSender::update_pause_time(unsigned v)
+void BitFeatureSender::update_pause_time()
 {
-	paused_time_ = v;
-	FDU_LOG(INFO) << app_ << ": change bitfeature sending interval to " << v;
+	paused_time_ = speed_manager_->get_next_pause_time();
+	FDU_LOG(INFO) << app_ << ": change bitfeature sending interval to " << paused_time_;
+}
+
+void BitFeatureSender::change_update_interval(unsigned v)
+{
+	FDU_LOG(ERR) << "not implemented!";
 }

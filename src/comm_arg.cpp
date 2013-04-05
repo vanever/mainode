@@ -53,6 +53,8 @@ bool CommArg::parse_info_file( const char * file )
 	group_pause = pt.get<unsigned>("group_pause", 10000);
 	packet_pause = pt.get<unsigned>("packet_pause", 3000);
 	use_packet_pause = pt.get<unsigned>("use_packet_pause", 1);
+	max_send_speed = pt.get<unsigned>("max_send_speed", 100000);	// need confirm
+	load_update_interval = pt.get<unsigned>("load_update_interval", 2);	// 20ms as a unit, 2 means 2 * 20ms
 
 	foreach (ptree::value_type &v, pt.get_child("libs"))
 		libs.push_back(v.second.get_value<string>());
@@ -62,6 +64,8 @@ bool CommArg::parse_info_file( const char * file )
 //		images.push_back(v.second.get_value<string>());
 	foreach (ptree::value_type &v, pt.get_child("sources"))
 		sources.push_back(v.second.get_value<string>());
+	foreach (ptree::value_type &v, pt.get_child("speed_files"))
+		speed_files.push_back(v.second.get_value<string>());
 
 	ASSERT(bind_ip.size(), "bind ip empty");
 	ASSERT(command_bind_ip.size(), "command bind ip empty");

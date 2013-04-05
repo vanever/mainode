@@ -21,6 +21,7 @@ struct CommArg : boost::noncopyable
 	std::vector<std::string> libs;
 	std::vector<std::string> image_libs;
 	std::vector<std::string> client_addrs;
+	std::vector<std::string> speed_files;
 
 	std::string file_to_match;
 	int nbits;
@@ -85,6 +86,8 @@ struct CommArg : boost::noncopyable
 	unsigned packet_pause;
 	unsigned group_pause;
 	int use_packet_pause;
+	unsigned max_send_speed; // frames/second
+	unsigned load_update_interval;
 
 	//---------------------------------------------------------------------------------------
 	// static

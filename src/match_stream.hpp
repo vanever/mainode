@@ -191,7 +191,7 @@ class BitFeatureLoader : public StreamNode
 
 public:
 
-	BitFeatureLoader(AppDomainPtr app);
+	BitFeatureLoader(AppDomain *);
 
 	virtual void do_run_task ();
 	virtual void do_end_task ();
@@ -202,33 +202,39 @@ private:
 	void load_section(unsigned short vid, unsigned short frompos, const BitFeature * bit_vec, unsigned size, MatcherPtr matcher, unsigned slice_idx);
 
 	std::size_t image_cnt_;
-	AppDomainPtr app_;
+	AppDomain * app_;
 	VideoLibVec vec_;
 
 };
+
+class SpeedManager;
 
 class BitFeatureSender : public StreamNode
 {
 
 public:
 
-	BitFeatureSender (AppDomainPtr);
+	BitFeatureSender (AppDomain *);
+	~BitFeatureSender();
 
 	virtual void do_run_task ();
 	virtual void do_end_task ();
 
 	void set_dest_addr( const endpoint & addr );
 	const endpoint dest_addr() const;
-	void update_pause_time(unsigned v);
+	void update_pause_time();
 	unsigned pause_time() const { return paused_time_; }
+	void change_update_interval(unsigned v);
 
 private:
 
 	void send_packets_loop();
 
-	AppDomainPtr app_;
+	AppDomain * app_;
+	SpeedManager * speed_manager_;
 	endpoint dest_addr_;
 	unsigned paused_time_;
+	unsigned last_task_id_;
 
 };
 

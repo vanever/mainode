@@ -53,7 +53,7 @@ void VideoLibVec::store(unsigned int word, bool from_net) {
 				rec.video_num = word & 0xFFFF;
 				rec.num_of_frames = (word >> 16) & 0xFFFF;
 			}
-			FDU_LOG(DEBUG) << "video_num: " << rec.video_num << "num_of_frames: " << rec.num_of_frames;
+//			FDU_LOG(DEBUG) << "video_num: " << rec.video_num << "num_of_frames: " << rec.num_of_frames;
 			if (rec.num_of_frames > 0) {
 				np_ = nw_ = 0;
 				point_.clear();
