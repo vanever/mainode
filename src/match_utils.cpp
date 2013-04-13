@@ -1,10 +1,12 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 //#include <bitset>
 #include <functional>
-#include <boost/dynamic_bitset.hpp>
+//#include <boost/dynamic_bitset.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/format.hpp>
 
 #include <opencv/cv.h>	
 #include <opencv/highgui.h>
@@ -267,6 +269,19 @@ void SectionManagerSimp::output_results(ostream& out, int test_id) {
 		out << "VideotoMatch " << sec.video_id() <<":" << sec.slice_id() << endl;
 		out << "LibVideo " << sec.lib_id() << ":" << sec.lib_pos() << endl;
 	}
+}
+
+vector<string> SectionManagerSimp::xml_results(int test_id, int slice_len) {
+	vector<string> result;
+	boost::format xml("<result test_video=\"%d\" test_pos=\"%d\" length=\"%d\" lib_video=\"%d\" lib_pos=\"%d\"/>\n");
+	test_id &= 0xfffff;
+	auto end = results_.lower_bound((long long)(test_id + 1) << 32);
+	for (auto p = results_.lower_bound((long long)test_id << 32); p != end; ++p) {
+		if (p->second < slice_thres_) continue;
+		MatchSection sec(test_id << 12, (p->first + 1) & 0xffffffff);
+		result.push_back(str(xml % sec.video_id() % (sec.slice_id() * slice_len) % slice_len % sec.lib_id() % (sec.lib_pos() / 60)));
+	}
+	return result;
 }
 
 void SectionManagerSimp::delete_results(int test_id) {

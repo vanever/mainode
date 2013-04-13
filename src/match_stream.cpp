@@ -256,6 +256,7 @@ void ConnectionBuilder::set_built(bool b)
 
 //--------------------------------------------------------------------------------------- 
 //
+#include <boost/format.hpp>
 
 BitFeatureLoader::BitFeatureLoader (AppDomain * app)
 	: image_cnt_(0)
@@ -267,7 +268,8 @@ void BitFeatureLoader::do_run_task()
 {
 	FDU_LOG(INFO) << "-- BitFeatureLoader start";
 	DomainInfoPtr pd = app_->domain_info_ptr();
-	loadLibNew(pd->NBits << 5, vec_, app_->match_source());
+	int nbits = pd->NBits << 5;
+	loadLibNew(nbits, vec_, (boost::format(CommArg::comm_arg().path_format) % app_->match_source() % nbits).str());
 	load_loop(vec_);
 }
 
@@ -342,14 +344,14 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 	if (sent_size != size)
 		FDU_LOG(DEBUG) << "cut bitfeature vector size from " << size << " to " << sent_size;
 
-	static u_char idx = 0;
 	unsigned cnt = 0;
 	Packet * pkt = window->acquire();
 	pkt->set_info(
 			matcher->first_flag() ? (BITFEATURE_TYPE | 0x10) : BITFEATURE_TYPE,
-			idx++,
+			matcher->bitfeature_count(),
 			max_data_len
 			);
+	matcher->increse_bitfeature_count();
 	matcher->demark_first_flag();
 	unsigned * p = (unsigned *)pkt->data_ptr();
 
@@ -390,7 +392,8 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 		{											
 			window->put();                       	
 			pkt = window->acquire();             	
-			pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+			pkt->set_info(BITFEATURE_TYPE, matcher->bitfeature_count(), max_data_len);
+			matcher->increse_bitfeature_count();
 			p = (unsigned *)pkt->data_ptr();         
 			cnt = 0;                              
 		}											
@@ -405,7 +408,9 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 			{
 				window->put();                       	
 				pkt = window->acquire();             	
-				pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+//				pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+				pkt->set_info(BITFEATURE_TYPE, matcher->bitfeature_count(), max_data_len);
+				matcher->increse_bitfeature_count();
 				p = (unsigned *)pkt->data_ptr();         
 				cnt = 0;                              
 			}											
@@ -426,7 +431,9 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 	{											
 		window->put();                       	
 		pkt = window->acquire();             	
-		pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+//		pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+		pkt->set_info(BITFEATURE_TYPE, matcher->bitfeature_count(), max_data_len);
+		matcher->increse_bitfeature_count();
 		p = (unsigned *)pkt->data_ptr();         
 		cnt = 0;                              
 	}											
@@ -440,7 +447,9 @@ void BitFeatureLoader::load_section (unsigned short vid, unsigned short frompos,
 		{
 			window->put();                       	
 			pkt = window->acquire();             	
-			pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+//			pkt->set_info(BITFEATURE_TYPE, idx++, max_data_len);
+			pkt->set_info(BITFEATURE_TYPE, matcher->bitfeature_count(), max_data_len);
+			matcher->increse_bitfeature_count();
 			p = (unsigned *)pkt->data_ptr();         
 			cnt = 0;                              
 		}
@@ -467,12 +476,13 @@ BitFeatureSender::BitFeatureSender(AppDomain * app)
 	, last_task_id_(0)
 {
 	unsigned idx = app->domain_info_ptr()->LibId;
-	if ( idx < CommArg::comm_arg().speed_files.size() )
+	if ( idx < CommArg::comm_arg().load_args.size() )
 	{
-		speed_manager_ = new SpeedManager(CommArg::comm_arg().speed_files[idx].c_str());
+		speed_manager_ = new SpeedManager(CommArg::comm_arg().load_args[idx].speed_file.c_str());
 	}
 	else
 	{
+		FDU_LOG(ERR) << "lib id error: " << idx << " should < " << CommArg::comm_arg().load_args.size();
 		speed_manager_ = new SpeedManager;
 	}
 	last_task_id_ = MiniTimer::instance().add_period_task(

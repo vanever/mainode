@@ -62,7 +62,7 @@ void ICommand::do_reply(unsigned msg_key)
 	r.msg_key = htonl(msg_key);
 	r.msg_len = 0;
 	CommandRecvService::instance().send(
-			boost::asio::mutable_buffers_1(&r, sizeof(ResponInfo))
+			boost::asio::buffer((const char *)&r, sizeof(ResponInfo))
 			);
 	FDU_LOG(INFO) << boost::format(" reply key 0x%08x") % msg_key;
 }
@@ -106,6 +106,27 @@ void RemoveNodesCommand::execute()
 }
 
 void RemoveNodesCommand::reply()
+{
+	ICommand::do_reply();
+}
+
+//---------------------------------------------------------------------------------- 
+void TellLoadsCommand::execute()
+{
+///	if (DomainInfoPtr pd = DomainInfo::find_domain_by_id(app_id_))
+//	{
+		foreach (auto load_pair, loads())
+		{
+			std::string nodeip = MatcherManager::id_to_ip(ntohl(load_pair.first));
+			//std::string nodeip = ICommand::unsigned_to_string(ntohl(nodeid));
+			FDU_LOG(INFO) << "Tell Loads: IP = " << nodeip << "  Load = " << load_pair.second;
+			MatcherPtr m = MatcherManager::make_matcher(nodeip, app_id_);
+			MatcherManager::instance().set_matcher_load( *m, load_pair.second );
+		}
+//	}
+}
+
+void TellLoadsCommand::reply()
 {
 	ICommand::do_reply();
 }

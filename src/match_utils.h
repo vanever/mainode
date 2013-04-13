@@ -130,6 +130,7 @@ public:
 	void add_section(const MatchSection& sec);
 
 	void output_results(std::ostream& os, int test_id);	// test_idÎª´ı²âÊÓÆµ±àºÅ£¨Ö¡±àºÅÇ°20Î»£©
+	std::vector<std::string> xml_results(int test_id, int slice_len);
 	void delete_results(int test_id);
 	void clear() { results_.clear(); }
 

@@ -30,7 +30,7 @@ bool CommandRecvService::end()
 	return server_end && no_command;
 }
 
-void CommandRecvService::send( const boost::asio::mutable_buffers_1 & buffer )
+void CommandRecvService::send( const boost::asio::const_buffers_1 & buffer )
 {
 	sock_.send_to(buffer, server_);
 }
@@ -132,7 +132,7 @@ CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsig
 				c = CommandPtr(cmd);
 			}
 			break;
-		case MSG_DEL_NODES:	// add node
+		case MSG_DEL_NODES:	// del node
 			{
 				//AppId d = cast<AppId>(msg); msg += sizeof(AppId);
 				U32 num_node = ntohl(cast<U32>(msg)); msg += sizeof(U32);
@@ -143,6 +143,21 @@ CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsig
 				for (int i = 0; i < num_node; i++)
 				{
 					cmd->add_target_node(nodes[i]);
+				}
+				c = CommandPtr(cmd);
+			}
+			break;
+		case MSG_TELL_LOADS:	// tell loads
+			{
+				if (!CommArg::comm_arg().update_load) break;
+				U32 num_node = length / 8;
+				if (length != num_node * 8)
+					FDU_LOG(ERR) << "length not match in MSG_TELL_LOADS";
+				TellLoadsCommand * cmd = new TellLoadsCommand(/*d*/);
+				U32 * nodes = (U32 *)msg;
+				for (int i = 0; i < num_node; i += 2)
+				{
+					cmd->add_load(nodes[i], nodes[i+1]);
 				}
 				c = CommandPtr(cmd);
 			}

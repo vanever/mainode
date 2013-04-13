@@ -64,6 +64,9 @@ void Server::open_services()
 			boost::bind(&CommandRecvService::run, &CommandRecvService::instance())
 			);
 	t4.detach();
+
+	//! start mini timer
+	MiniTimer::instance().run();
 }
 
 void Server::recv_diverse_handler(const boost::system::error_code& ec, size_t length)

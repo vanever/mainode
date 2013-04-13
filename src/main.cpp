@@ -15,19 +15,20 @@ int main(int argc, char *argv[])
 		string  cfg_file("match.cfg");
 		string host_file("host_file");
 
-		if (argc != 3)
+		if (argc < 2)
 		{
-			FDU_LOG(WARN) << "usage: " << argv[0] << " cfg_file host_file";
-			FDU_LOG(WARN) << "using default: match.cfg host_file";
+//			FDU_LOG(WARN) << "usage: " << argv[0] << " cfg_file host_file";
+//			FDU_LOG(WARN) << "using default: match.cfg host_file";
+			FDU_LOG(WARN) << "usage: " << argv[0] << " cfg_file";
+			FDU_LOG(WARN) << "using default: match.cfg";
 		}
 		else
 		{
 			cfg_file  = string(argv[1]);
-			host_file = string(argv[2]);
+//			host_file = string(argv[2]);
 		}
 
 		boost::timer::cpu_timer c;
-		LOG::init_log_file("log");
 		LOG::set_console_filter(LOG::flt::attr<LOG::severity_level>("Severity") >= LOG::INFO);
 
 		if (!CommArg::comm_arg().parse_info_file( cfg_file.c_str() ))
@@ -35,11 +36,11 @@ int main(int argc, char *argv[])
 			cout << "error parsing config file" << endl;
 			return -1;
 		}
-		if (!CommArg::comm_arg().parse_host_file( host_file.c_str() ))
-		{
-			cout << "error parsing host file" << endl;
-			return -1;
-		}
+//		if (!CommArg::comm_arg().parse_host_file( host_file.c_str() ))
+//		{
+//			cout << "error parsing host file" << endl;
+//			return -1;
+//		}
 
 		Server::construct_server( &CommArg::comm_arg() );
 		Server::instance().start_main();

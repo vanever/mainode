@@ -1,8 +1,39 @@
 #include "app_manager.hpp"
 #include "match_stream.hpp"
+#include "command_recv_service.hpp"
 #include <numeric>
+#include <boost/format.hpp>
 
 using namespace std;
+
+ResultPacket::ResultPacket(DomainInfoPtr pd)
+	: src_id(pd->LoadBalanceId)
+	, snk_id(pd->TerminalId)
+	, msg_id(htonl(DCSP::MSG_RESULT_RPT))
+	, report_id(0)
+	, app_id(pd->ApplicationId)
+	, timestamp(0)
+{ 
+}
+
+void ResultPacket::put_line(const string& line)
+{
+	int len = strlen(result) + line.length();
+	if (len > max_len) {
+		FDU_LOG(ERR) << "ResultPacket: result too long: " << len;
+	}
+	strcat(result, line.c_str());
+		++lines;
+}
+
+void ResultPacket::send()
+{
+	int len = strlen(result);
+	msg_len = htons(20 + len);
+	CommandRecvService::instance().send(boost::asio::buffer((const char *)this, 34 + len));
+	clear();
+	report_id = htons(ntohs(report_id) + 1);
+}
 
 AppDomain::AppDomain(DomainInfoPtr pd)
 	: appid_(pd->ApplicationId)
@@ -11,11 +42,20 @@ AppDomain::AppDomain(DomainInfoPtr pd)
 	, sec_man_(pd->ReMergeThrehold) 
 	, domaininfo_(pd)
 	, sent_frames_(0)
+	, result_pkt_(pd)
 {
-	ASSERTS(pd->LibId < CommArg::comm_arg().sources.size());	// currently use lib id as source id
-	match_source_ = CommArg::comm_arg().sources[pd->LibId];
+	pd->LibId = ntohs(pd->LibId);
+	ASSERTS(pd->LibId < CommArg::comm_arg().load_args.size());	// currently use lib id as source id
+	match_source_ = CommArg::comm_arg().load_args[pd->LibId].source;
 	loader_ = new BitFeatureLoader(this);
 	sender_ = new BitFeatureSender(this);
+	unsigned domain_id = ntohs(appid_.DomainId);
+	U64 domain_time = ntohll(appid_.TimeStamp);
+	lib_file_ = (boost::format(CommArg::comm_arg().path_format) % CommArg::comm_arg().load_args[pd->LibId].lib % (pd->NBits << 5)).str();
+//	out_file_.open((boost::format(CommArg::comm_arg().out_file) % domain_id).str());
+	out_file_.open((boost::format("%1%-%2%.xml") % domain_id % domain_time).str());
+	if (CommArg::comm_arg().update_load)
+		CommArg::comm_arg().node_speed = ntohs(pd->SpeedPerPipe) * pd->NumTotalPipe;
 
 	boost::thread t(boost::bind(&AppDomain::trigger_run, this));
 	t.detach();
@@ -27,22 +67,26 @@ AppDomain::~AppDomain()
 	if (sender_) delete sender_;
 }
 
-void AppDomain::output_result(const std::string & path)
-{
-	ofstream out(path.c_str());
-	ASSERT(out, "cannot open " << path);
-	output_result(out);
-}
-
-void AppDomain::output_result(std::ostream & out, unsigned testid)
-{
-	sec_man_.output_results(out, testid);
-}
-
 void AppDomain::output_result(std::ostream & out)
 {
 	foreach (unsigned testid, testid_set_)
 		sec_man_.output_results(out, testid);
+}
+
+// todo: send to dcsp
+void AppDomain::output_result(unsigned testid)
+{
+	static const int max_lines = 12;
+
+	vector<string> results = sec_man_.xml_results(testid, domain_info_ptr()->SliceLen);
+	foreach (const string& line, results) {
+		out_file_ << line;
+		result_pkt_.put_line(line);
+		if (result_pkt_.lines >= max_lines) result_pkt_.send();
+	}
+	if (result_pkt_.lines > 0) result_pkt_.send();
+
+	sec_man_.delete_results(testid);
 }
 
 unsigned AppDomain::unhandled_frames() const

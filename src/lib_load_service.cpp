@@ -1,6 +1,7 @@
 #include "lib_load_service.hpp"
 #include "match_stream.hpp"
 #include "server.hpp"
+#include <boost/format.hpp>
 
 using namespace std;
 
@@ -16,22 +17,19 @@ LibLoadService::LibLoadService(const LibLoadService & l)
 void LibLoadService::load_domain_lib_to_mem(DomainType d)
 {
 	libmap_.insert(make_pair(d, VideoLibVec()));
-	if (DomainInfoPtr pd = DomainInfo::find_domain_by_id(d))
+	if (AppDomainPtr pa = AppManager::instance().get_domain_by_appid(d))
 	{
-		if (pd->LibId < CommArg::comm_arg().libs.size())
-		{
-			load_lib_to_mem(CommArg::comm_arg().libs[pd->LibId], libmap_[d]);
-		}
-		else
-			FDU_LOG(ERR) << "lib id error: " << pd->LibId << " should < " << CommArg::comm_arg().libs.size();
+		load_lib_to_mem(pa->lib_file(), libmap_[d]);
 	}
 	else
-		FDU_LOG(ERR) << __func__ << " domain not found ";
+		FDU_LOG(ERR) << __func__ << " App not found: " << d;
 }
 
+// Toto: load lib for each app
 void LibLoadService::load_lib_to_mem(const std::string & path, VideoLibVec & lib)
 {
 	unsigned nbits = CommArg::comm_arg().nbits;
+//	loadLibNew(nbits, lib, (boost::format(CommArg::comm_arg().path_format) % path % nbits).str());
 	loadLibNew(nbits, lib, path);
 
 	// add a dummy rec with code = 0 && contents = 0

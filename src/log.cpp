@@ -31,9 +31,8 @@ Log::Log() : core_(logging::core::get()) {
 	);
 }
 
-void Log::init_log_file(const std::string& log_file, const std::string& prog_name) {
+void Log::init_log_file(const std::string& log_file, int rotation_size) {
 	core_->add_global_attribute("TimeStamp", make_shared<attrs::local_clock>());
-	core_->add_global_attribute("ProgName", make_shared<attrs::constant<std::string> >(prog_name));
 	core_->remove_sink(sink_file_);				// remove old sink
 	sink_file_ = logging::init_log_to_file(		// add new sink
 		keywords::file_name = log_file,
@@ -41,10 +40,11 @@ void Log::init_log_file(const std::string& log_file, const std::string& prog_nam
 		keywords::auto_flush = true,
 		keywords::format = fmt::format("[%1%] %2%: %3%")
 			% fmt::date_time<boost::posix_time::ptime>("TimeStamp")
-//			% fmt::attr<std::string>("ProgName")
 			% fmt::attr<severity_level>("Severity", "%-7s")
 			% fmt::message()
 	);
+	if (rotation_size > 0)
+		sink_file_->locked_backend()->set_rotation_size(rotation_size);
 }
 
 }

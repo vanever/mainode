@@ -30,6 +30,8 @@ typedef boost::shared_ptr< Matcher > MatcherPtr;
 
 typedef std::map<DomainType, DomainInfoPtr> DomainMap;
 
+inline U64 ntohll(U64 x) { return ((U64)htonl((x & 0xFFFFFFFF)) << 32) | htonl(x >> 32); }
+
 struct AppId
 {
 	U16 DomainId;
@@ -38,11 +40,8 @@ struct AppId
 	std::string to_string() const {
 		using namespace boost::posix_time;
 		using namespace boost::gregorian;
-		U64 timestamp = (htonl((TimeStamp & 0xFFFFFFFF)) << 32) | htonl(TimeStamp >> 32);
-		time_duration td = milliseconds(timestamp);
-		date d(1970, Jan, 1);
-		ptime pt(d, td);
-		return std::string("App-") + boost::lexical_cast<string>(DomainId) + "-" + to_simple_string(pt);
+		ptime pt(date(1970, Jan, 1), milliseconds(ntohll(TimeStamp)));
+		return std::string("App-") + boost::lexical_cast<string>(htons(DomainId)) + "-" + to_simple_string(pt);
 	}
 } __attribute__((packed));
 
@@ -174,6 +173,10 @@ public:
 	void increse_result_count() { ++result_count_; }
 	void clear_result_count() { result_count_ = 0; }
 
+	U08 bitfeature_count() const { return bitfeature_count_; }
+	void increse_bitfeature_count() { ++bitfeature_count_; }
+	void clear_bitfeature_count() { bitfeature_count_ = 0; }
+
 private:
 
 	boost::mutex monitor_;
@@ -188,6 +191,7 @@ private:
 
 	bool first_flag_;
 	U08 result_count_;
+	U08 bitfeature_count_;
 
 };
 
@@ -221,6 +225,7 @@ public:
 
 	Matcher::MATCHER_STATE get_matcher_state( const Matcher & m ) const;
 	void set_matcher_state( const Matcher & m , Matcher::MATCHER_STATE s );
+	void set_matcher_load( const Matcher & m , unsigned load );
 
 	void print_matchers     (std::ostream & out) const;
 

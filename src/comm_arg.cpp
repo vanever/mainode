@@ -20,10 +20,13 @@ bool CommArg::parse_info_file( const char * file )
 	ptree pt;
 	read_info(file, pt);
 
-	out_file      = pt.get<string>("out_file", "match_result.xml");
-	log_file      = pt.get<string>("log_file", "log");
-	bind_ip       = pt.get<string>("bind_ip");
+	string log_file      = pt.get<string>("log_file", "mainode_%N.log");
+	unsigned log_rotation_size = pt.get<unsigned>("log_rotation_size", 0);
+	LOG::init_log_file(log_file, log_rotation_size);
 
+	out_file      = pt.get<string>("out_file", "match_result_%d.xml");
+
+	bind_ip       = pt.get<string>("bind_ip");
 	server_port               = pt.get<unsigned short>("server_port", 0xFD01);
 	send_port                 = pt.get<unsigned short>("send_port", 0xFD02);
 	fpga_port                 = pt.get<unsigned short>("fpga_port", 0xFD00);
@@ -32,7 +35,6 @@ bool CommArg::parse_info_file( const char * file )
 	conn_build_wait_time      = pt.get<int>("conn_build_wait_time", 200);
 
 	// add 2013/02/22
-	file_to_match      = pt.get<string>("file_to_match");
 	nbits              = pt.get<int>("nbits", 32);
 	framegroup_size    = pt.get<int>("framegroup_size", 512);		// need confirm
 	balance_threshold  = pt.get<int>("balance_threshold", 1024);	// need confirm
@@ -40,7 +42,6 @@ bool CommArg::parse_info_file( const char * file )
 	match_threshold    = pt.get<int>("match_threshold", 1);	// need confirm
 	merge_threshold    = pt.get<int>("merge_threshold", 7);	// need confirm
 	node_speed         = pt.get<double>("node_speed", 800);	// need confirm
-	ASSERT(file_to_match.size(), "empty file_to_match");
 
 	// add 2013/2/26
 	lib_id = pt.get<unsigned>("lib_id", 0);
@@ -53,32 +54,24 @@ bool CommArg::parse_info_file( const char * file )
 	group_pause = pt.get<unsigned>("group_pause", 10000);
 	packet_pause = pt.get<unsigned>("packet_pause", 3000);
 	use_packet_pause = pt.get<unsigned>("use_packet_pause", 1);
+	update_load = pt.get<unsigned>("update_load", 1);
 	max_send_speed = pt.get<unsigned>("max_send_speed", 100000);	// need confirm
 	load_update_interval = pt.get<unsigned>("load_update_interval", 2);	// 20ms as a unit, 2 means 2 * 20ms
 
-	foreach (ptree::value_type &v, pt.get_child("libs"))
-		libs.push_back(v.second.get_value<string>());
-//	foreach (ptree::value_type &v, pt.get_child("videos"))
-//		videos.push_back(v.second.get_value<string>());
-//	foreach (ptree::value_type &v, pt.get_child("images"))
-//		images.push_back(v.second.get_value<string>());
-	foreach (ptree::value_type &v, pt.get_child("sources"))
-		sources.push_back(v.second.get_value<string>());
-	foreach (ptree::value_type &v, pt.get_child("speed_files"))
-		speed_files.push_back(v.second.get_value<string>());
-
 	ASSERT(bind_ip.size(), "bind ip empty");
 	ASSERT(command_bind_ip.size(), "command bind ip empty");
-//	ASSERT(device.size(), "empty device");
-//	ASSERT(videos.size() || images.size(), "no image or video");
-//	ASSERT(video_beg >= 0 && video_end > 0, "no begin end pos");
 
-	if (only_send_image) do_surf = 0;
+	path_format = pt.get<std::string>("path_format", "%s_%d.bin");
 
-	FDU_LOG(INFO) << "libs num: " << libs.size();
-	FDU_LOG(INFO) << "images num: " << images.size();
-	FDU_LOG(INFO) << "videos num: " << videos.size();
-	FDU_LOG(INFO) << "do surf: " << (do_surf ? "true" : "false");
+	foreach (ptree::value_type &v, pt.get_child("load_args")) {
+		LoadArg arg;
+		ASSERTS(stoi(v.second.data()) == load_args.size());
+		arg.lib = v.second.get<string>("lib");
+		arg.source = v.second.get<string>("source");
+		arg.speed_file = v.second.get<string>("speed_file");
+		load_args.push_back(arg);
+	}
+	ASSERT(load_args.size(), "load_args empty");
 
 	return true;
 }

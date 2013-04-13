@@ -11,6 +11,7 @@ namespace DCSP {
 	const unsigned MSG_CREATE_DOMAIN    = 0x00010005;
 	const unsigned MSG_REPLY            = 0x0001006F;
 	const unsigned MSG_OMC_REQ          = 0x00010002;
+	const unsigned MSG_RESULT_RPT       = 0x00030003;
 
 	const unsigned MSG_QUERY_LOADS      = 0x00020042;
 	const unsigned MSG_REPORT_LOADS     = 0x00020043;
@@ -42,9 +43,9 @@ struct DCSPPacket
 		msg_len = htons(msg_len);
 	}
 
-	const boost::asio::mutable_buffers_1 to_buffer()
+	boost::asio::const_buffers_1 to_buffer()
 	{
-		auto ret = boost::asio::buffer((U08 *)this, 14 + msg_len);
+		auto ret = boost::asio::buffer((const U08 *)this, 14 + msg_len);
 		do_hton();
 		return ret;
 	}
@@ -124,6 +125,36 @@ private:
 
 	AppId app_id_;
 	Nodes nodes_;
+
+};
+
+//---------------------------------------------------------------------------------- 
+class TellLoadsCommand : public ICommand
+{
+
+public:
+
+	typedef std::map<unsigned, unsigned> Loads;
+
+	TellLoadsCommand(/*AppId id*/)
+		: app_id_{0,0}		// C++11风格初始化
+	{
+	}
+
+	void add_load(unsigned node_id, unsigned load)
+	{
+		loads_[node_id] = ntohl(load);
+	}
+
+	const Loads & loads() { return loads_; }
+
+	virtual void execute();
+	virtual void reply  ();
+
+private:
+
+	AppId app_id_;
+	Loads loads_;
 
 };
 

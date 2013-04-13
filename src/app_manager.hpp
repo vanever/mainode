@@ -1,6 +1,7 @@
 #ifndef APP_MANAGER_HPP
 #define APP_MANAGER_HPP
 
+#include <fstream>
 #include "matcher_manager.hpp"
 #include "match_utils.h"
 #include <boost/noncopyable.hpp>
@@ -8,6 +9,26 @@
 
 class BitFeatureLoader;
 class BitFeatureSender;
+
+struct ResultPacket {
+	static const int max_len = 1380;
+
+	U32 src_id;
+	U32 snk_id;
+	U32 msg_id;
+	U16 msg_len;
+	U16 report_id;
+	AppId app_id;
+	U64 timestamp;
+	char result[max_len + 2];
+	int lines;
+
+	ResultPacket(DomainInfoPtr);
+	void put_line(const string& line);
+	void clear() { result[0] = lines = 0; }
+	void send();
+
+}__attribute__((packed));
 
 /// use to store domain specific data
 class AppDomain : public boost::noncopyable
@@ -21,8 +42,7 @@ public:
 	BitFeatureWindow * window() { return &window_; }
 
 	void output_result(std::ostream & out);
-	void output_result(std::ostream & out, unsigned testid);
-	void output_result(const std::string & path);
+	void output_result(unsigned testid);
 
 	void add_testid(unsigned testid) { testid_set_.insert(testid); }
 	void add_section(const MatchSection & sec) { sec_man_.add_section(sec); }
@@ -30,6 +50,7 @@ public:
 	DomainInfoPtr domain_info_ptr() { return domaininfo_; }
 
 	const std::string match_source() const { return match_source_; }
+	const std::string lib_file() const { return lib_file_; }
 
 	BitFeatureLoader * bitfeature_loader() { return loader_; }
 	BitFeatureSender * bitfeature_sender() { return sender_; }
@@ -58,10 +79,14 @@ private:
 	SectionManagerSimp sec_man_;
 	std::set<unsigned> testid_set_;
 	DomainInfoPtr domaininfo_;
+	std::string lib_file_;
+	std::ofstream out_file_;
 
 	unsigned sent_frames_;
-
+	
+	ResultPacket result_pkt_;
 };
+
 
 typedef boost::shared_ptr<AppDomain> AppDomainPtr;
 

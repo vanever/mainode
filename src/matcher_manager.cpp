@@ -57,6 +57,7 @@ Matcher::Matcher ( const endpoint_type & e )
 	, domain_id_(   )
 	, first_flag_(true)
 	, result_count_(0)
+	, bitfeature_count_(0)
 {
 }
 
@@ -67,6 +68,7 @@ Matcher::Matcher ( const endpoint_type & e, DomainType d )
 	, domain_id_(   )
 	, first_flag_(true)
 	, result_count_(0)
+	, bitfeature_count_(0)
 {
 	if (DomainInfoPtr pd = DomainInfo::find_domain_by_id(d))
 	{
@@ -184,6 +186,18 @@ void MatcherManager::set_matcher_state( const Matcher & m , Matcher::MATCHER_STA
 	}
 }
 
+void MatcherManager::set_matcher_load( const Matcher & m , unsigned load )
+{
+	if (MatcherPtr n = find(m))
+	{
+		n->set_num_load( load );
+	}
+	else
+	{
+		FDU_LOG(ERR) << __func__ << ": matcher " << m.to_endpoint() << " not found";
+	}
+}
+
 void MatcherManager::connect_matcher( const Matcher & m )
 {
 	lock lk(monitor_);
@@ -234,6 +248,7 @@ void MatcherManager::update_all_matcher_load(unsigned elapsed_time)
 {
 	lock lk(monitor_);
 	unsigned reduced = (double(elapsed_time) / 1000.0) * CommArg::comm_arg().node_speed;
+//	FDU_LOG(DEBUG) << "reduced = " << reduced;
 	Matchers ms(find_matchers_at_state(Matcher::READY));
 	foreach (MatcherPtr m, ms)
 	{
@@ -438,6 +453,6 @@ MatcherManager::MatcherManager()
 	timer_.stop();
 	MiniTimer::instance().add_period_task(
 			CommArg::comm_arg().load_update_interval,
-			boost::bind(&MatcherManager::update_all_matcher_load, this, CommArg::comm_arg().load_update_interval)
+			boost::bind(&MatcherManager::update_all_matcher_load, this, CommArg::comm_arg().load_update_interval * MiniTimer::instance().unit())
 			);
 }

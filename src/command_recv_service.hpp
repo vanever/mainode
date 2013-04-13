@@ -29,7 +29,7 @@ public:
 	void stop_io_service() { io_.stop(); }
 	static CommandPtr make_command(u_char * buff, unsigned length, unsigned msg_id);
 
-	void send( const boost::asio::mutable_buffers_1 & buffer );
+	void send( const boost::asio::const_buffers_1 & buffer );
 
 private:
 

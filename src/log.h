@@ -35,7 +35,7 @@ namespace LOG {
 
 	class Log : boost::noncopyable {
 	public:
-		void init_log_file(const std::string& log_file, const std::string& prog_name);
+		void init_log_file(const std::string& log_file, int rotation_size);
 
 		sev_logger&    logger()    { return slg_;       }
 		sp_stream_sink con_sink()  { return sink_con_;  }
@@ -54,8 +54,8 @@ namespace LOG {
 
 	inline sev_logger& get_logger() { return Log::get().logger(); }
 
-	inline void init_log_file(const std::string& log_file, const std::string& prog_name = "")
-	{ Log::get().init_log_file(log_file, prog_name); }
+	inline void init_log_file(const std::string& log_file, int rotation_size = 0)
+	{ Log::get().init_log_file(log_file, rotation_size); }
 
 	template<typename SP, typename FMT> inline void set_format(SP sink, FMT const& fmt)
 	{ sink->locked_backend()->set_formatter(fmt); }

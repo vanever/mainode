@@ -35,6 +35,8 @@ public:
 	unsigned add_onetime_task   (unsigned interval, FuncType f);
 	void     remove_period_task (unsigned id);
 
+	unsigned unit() const { return unit_; }
+
 	/// not blocked, start run loop in another thread
 	void run();
 

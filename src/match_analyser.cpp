@@ -30,7 +30,7 @@ void MatchAnalyser::handle_packet( Packet & pkt, const udp::endpoint & from_addr
 
 	u_char wanted_idx = pm->result_count();
 	if (pkt.index() != wanted_idx) {
-		FDU_LOG(DEBUG) << "MatchAnalyser wanted: " << (int)wanted_idx << " but received: " << pkt.index() << " skip this packet.";
+		FDU_LOG(DEBUG) << "MatchAnalyser wanted: " << (int)wanted_idx << " but received: " << (int)pkt.index() << " skip this packet.";
 		return;
 	}
 
@@ -59,7 +59,7 @@ void MatchAnalyser::handle_packet( Packet & pkt, const udp::endpoint & from_addr
 			papp->add_section( MatchSection(tb, lb, papp->domain_info_ptr()->MergeUnit) );
 		else if (tb)
 		{	// output condition
-			papp->output_result(std::cout, tb >> 12);
+			papp->output_result(tb >> 12);
 		}
 		else
 		{

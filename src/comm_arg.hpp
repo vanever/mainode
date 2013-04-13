@@ -5,6 +5,13 @@
 #include <vector>
 #include <boost/noncopyable.hpp>
 
+struct LoadArg
+{
+	std::string lib;
+	std::string source;
+	std::string speed_file;
+};
+
 struct CommArg : boost::noncopyable
 {
 	bool parse_info_file(const char * file);
@@ -12,16 +19,19 @@ struct CommArg : boost::noncopyable
 
 	std::string    device;
 	std::string    out_file;
-	std::string    log_file;
+	
 	std::string    extract_addr;
 	std::string    bind_ip;
-	std::vector<std::string> images;
+/*	std::vector<std::string> images;
 	std::vector<std::string> videos;
 	std::vector<std::string> sources;
 	std::vector<std::string> libs;
 	std::vector<std::string> image_libs;
+	std::vector<std::string> speed_files; */
 	std::vector<std::string> client_addrs;
-	std::vector<std::string> speed_files;
+
+	std::string path_format;
+	std::vector<LoadArg> load_args;
 
 	std::string file_to_match;
 	int nbits;
@@ -48,10 +58,10 @@ struct CommArg : boost::noncopyable
 
 	int num_clients;
 
-	int video_beg;
-	int video_end;
+//	int video_beg;
+//	int video_end;
 
-	int do_surf;
+//	int do_surf;
 
 	int match_timeout;
 	int match_width;
@@ -86,6 +96,7 @@ struct CommArg : boost::noncopyable
 	unsigned packet_pause;
 	unsigned group_pause;
 	int use_packet_pause;
+	int update_load;
 	unsigned max_send_speed; // frames/second
 	unsigned load_update_interval;
 
@@ -100,9 +111,7 @@ struct CommArg : boost::noncopyable
 
 private:
 
-	CommArg()
-		: video_beg(-1), video_end(-1)
-	{}
+	CommArg() {}
 
 };
 

@@ -118,7 +118,7 @@ void MiniTimer::timer_handler(const boost::system::error_code & ec)
 {
 	lock lk(monitor_);
 	++tick_;
-	FDU_LOG(DEBUG) << "tick count: " << tick_;
+	//FDU_LOG(DEBUG) << "tick count: " << tick_;
 	if (!ec)
 	{
 		foreach (TaskMap::value_type & tasks_pair, period_tasks_)
