@@ -288,39 +288,43 @@ void BitFeatureLoader::load_loop(const VideoLibVec & videos)
 
 	AppId appid = app_->appid();
 
-	foreach (const VideoLibRec & rec, videos)
-	{
-//		unsigned framegroup_size = CommArg::comm_arg().framegroup_size;
-		unsigned framegroup_size = app_->domain_info_ptr()->SliceLen * 60;
-		unsigned num_of_frames = rec.num_of_frames;
-		unsigned short vid = rec.video_num;
-		unsigned short pos = 0;
-		unsigned short num_slice = 0;
-		while (num_of_frames > framegroup_size)
-		{
-			MatcherPtr node = MatcherManager::instance().choose_next_matcher_for_domain(appid);
-//			MatcherManager::instance().start_timer();
-//			vector<BitFeature> features(&rec.point_vec[pos], &rec.point_vec[pos + framegroup_size]);
-			load_section(vid, pos, &rec.point_vec[pos], framegroup_size, node, num_slice);
-			unsigned testid = (vid << 10) + num_slice;
-			app_->add_testid(testid);
-			num_slice++;
-			window->wait_until_box_empty();		// must
-			node->increase_load( framegroup_size );
-//			MatcherManager::instance().update_all_matcher_load();	// will stop timer
+	unsigned repeat_times = app_->source_repeat_times();
 
-			num_of_frames -= framegroup_size;
-			pos           += framegroup_size;
+	while (repeat_times--) {
+		foreach (const VideoLibRec & rec, videos)
+		{
+			//		unsigned framegroup_size = CommArg::comm_arg().framegroup_size;
+			unsigned framegroup_size = app_->domain_info_ptr()->SliceLen * 60;
+			unsigned num_of_frames = rec.num_of_frames;
+			unsigned short vid = rec.video_num;
+			unsigned short pos = 0;
+			unsigned short num_slice = 0;
+			while (num_of_frames > framegroup_size)
+			{
+				MatcherPtr node = MatcherManager::instance().choose_next_matcher_for_domain(appid);
+				//			MatcherManager::instance().start_timer();
+				//			vector<BitFeature> features(&rec.point_vec[pos], &rec.point_vec[pos + framegroup_size]);
+				load_section(vid, pos, &rec.point_vec[pos], framegroup_size, node, num_slice);
+				unsigned testid = (vid << 10) + num_slice;
+				app_->add_testid(testid);
+				num_slice++;
+				window->wait_until_box_empty();		// must
+				node->increase_load( framegroup_size );
+				//			MatcherManager::instance().update_all_matcher_load();	// will stop timer
+
+				num_of_frames -= framegroup_size;
+				pos           += framegroup_size;
+			}
+			//		if (num_of_frames)
+			//		{
+			//			MatcherPtr node = MatcherManager::instance().choose_next_matcher_for_domain(appid);
+			//			MatcherManager::instance().start_timer();
+			//			load_section(vid, pos, &rec.point_vec[pos], num_of_frames, node, num_slice++);
+			//			window->wait_until_box_empty();		// must
+			//			node->increase_load( num_of_frames );
+			//			MatcherManager::instance().update_all_matcher_load();	// will stop timer
+			//		}
 		}
-//		if (num_of_frames)
-//		{
-//			MatcherPtr node = MatcherManager::instance().choose_next_matcher_for_domain(appid);
-//			MatcherManager::instance().start_timer();
-//			load_section(vid, pos, &rec.point_vec[pos], num_of_frames, node, num_slice++);
-//			window->wait_until_box_empty();		// must
-//			node->increase_load( num_of_frames );
-//			MatcherManager::instance().update_all_matcher_load();	// will stop timer
-//		}
 	}
 }
 
@@ -545,7 +549,20 @@ void BitFeatureSender::update_pause_time()
 	FDU_LOG(INFO) << app_ << ": change bitfeature sending interval to " << paused_time_;
 }
 
-void BitFeatureSender::change_update_interval(unsigned v)
+void BitFeatureSender::set_update_interval(unsigned v)
 {
-	FDU_LOG(ERR) << "not implemented!";
+	MiniTimer::instance().remove_period_task(last_task_id_);
+	last_task_id_ = MiniTimer::instance().add_period_task(
+			v,	// new interval, unit: 20ms 
+			boost::bind(&BitFeatureSender::update_pause_time, this)
+			);
+	FDU_LOG(INFO)
+		<< "change load update interval from "
+		<< speed_manager_->original_interval() * 20 << " to " << v * 20;
+}
+
+void BitFeatureSender::set_value_weight(unsigned v)
+{
+	speed_manager_->set_weight(v);
+	FDU_LOG(INFO) << "change weight to " << v;
 }

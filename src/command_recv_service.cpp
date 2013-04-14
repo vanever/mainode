@@ -13,9 +13,12 @@ namespace {
 	{
 		return ntohl(id);
 	}
+
+	const unsigned DEBUG_SET_LOAD_UPDATE_INTERVAL  = 0xFDFD0001;
+	const unsigned DEBUG_SET_LOAD_VALUE_WEIGHT     = 0xFDFD0002;
+	const unsigned MSG_SHOW_APP_RESULT             = 0x00000070;
 }
 
-const unsigned MSG_SHOW_APP_RESULT = 0x00000070;
 
 CommandRecvService & CommandRecvService::instance()
 {
@@ -32,6 +35,8 @@ bool CommandRecvService::end()
 
 void CommandRecvService::send( const boost::asio::const_buffers_1 & buffer )
 {
+	static boost::mutex monitor;
+	boost::mutex::scoped_lock lk(monitor);
 	sock_.send_to(buffer, server_);
 }
 
@@ -58,10 +63,49 @@ void CommandRecvService::command_execute_loop()
 
 void CommandRecvService::send_packets_loop()
 {
+	if (CommArg::comm_arg().disable_sending_report_timeout == 1)
+	{
+		return ;
+	}
 	CommandWindow * window = Server::instance().command_window();
 	while (DCSPPacketPtr pkt = window->get())
 	{
 		send(pkt->to_buffer());
+	}
+}
+
+void CommandRecvService::debug_command_recv()
+{
+//	tcp::acceptor acpt(io_, tcp::endpoint(
+//				ip::address::from_string(CommArg::comm_arg().bind_ip), CommArg::comm_arg().server_port
+//				));
+//	tcp::socket sock(io_);
+
+	udp::socket sock(io_, udp::endpoint(
+				ip::address::from_string(CommArg::comm_arg().command_bind_ip), CommArg::comm_arg().command_bind_port
+				));
+	udp::endpoint sender_endpoint;
+
+	DCSPPacket pkt;
+	U08 * bytes = (U08 *)&pkt;
+
+	while (!end()) {
+		
+		size_t length = sock.receive_from(boost::asio::buffer(bytes, sizeof(DCSPPacket)), sender_endpoint);	// block
+		FDU_LOG(INFO) << "accept debug command from: " << sender_endpoint;
+		if (length > 0)
+		{
+			pkt.do_ntoh();
+			U16 msg_len = pkt.msg_len;
+//			if (msg_len != length - 14)
+//			{
+//				FDU_LOG(WARN) << "message length not match: " << msg_len << " wanted is " << length - 14;
+//			}
+			if (CommandPtr c = make_command(pkt.msg, msg_len, pkt.msg_id))
+			{
+				Server::instance().command_queue()->put( c );
+			}
+		}
 	}
 }
 
@@ -76,6 +120,10 @@ void CommandRecvService::run()
 			boost::bind(&CommandRecvService::send_packets_loop, this)
 			);
 	t2.detach();
+	boost::thread t3(
+			boost::bind(&CommandRecvService::debug_command_recv, this)
+			);
+	t3.detach();
 
 	DCSPPacket pkt;
 	U08 * bytes = (U08 *)&pkt;
@@ -87,8 +135,11 @@ void CommandRecvService::run()
 		if (length > 0)
 		{
 			pkt.do_ntoh();
-			CommArg::comm_arg().pdss_id = pkt.src_id;		// record PDSS_ID
-			CommArg::comm_arg().mainode_id = pkt.snk_id;	// record MAINODE_ID
+			if (pkt.msg_id == MSG_CREATE_DOMAIN)
+			{
+				CommArg::comm_arg().pdss_id = pkt.src_id;		// record PDSS_ID
+				CommArg::comm_arg().mainode_id = pkt.snk_id;	// record MAINODE_ID
+			}
 			U16 msg_len = pkt.msg_len;
 			if (msg_len != length - 14)
 			{
@@ -104,6 +155,9 @@ void CommandRecvService::run()
 
 CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsigned msg_id)
 {
+	static boost::mutex monitor;
+	boost::mutex::scoped_lock lk(monitor);
+
 	CommandPtr c;
 
 	switch (msg_id)
@@ -173,6 +227,41 @@ CommandPtr CommandRecvService::make_command(u_char * msg, unsigned length, unsig
 			{
 				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
 				QueryLoadsCommand * cmd = new QueryLoadsCommand(d);
+				c = CommandPtr(cmd);
+			}
+			break;
+		case DEBUG_SET_LOAD_UPDATE_INTERVAL:
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				unsigned new_interval = cast<unsigned>(msg); msg += sizeof(unsigned);
+				FDU_LOG(INFO) << "update interval to " << new_interval;
+				SetUpdateIntervalCommand * cmd = new SetUpdateIntervalCommand(d, new_interval);
+				c = CommandPtr(cmd);
+			}
+			break;
+		case DEBUG_SET_LOAD_VALUE_WEIGHT:
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				unsigned new_weight = cast<unsigned>(msg); msg += sizeof(unsigned);
+				FDU_LOG(INFO) << "update weight to " << new_weight;
+				SetValueWeightCommand * cmd = new SetValueWeightCommand(d, new_weight);
+				c = CommandPtr(cmd);
+			}
+			break;
+		case MSG_REPORT_REPLY:
+			{
+				U16 idx = ntohs(cast<U16>(msg)); msg += sizeof(U16);
+				FDU_LOG(DEBUG) << "report confirm: " << idx;
+				Server::instance().command_window()->mark_confirmed(idx);
+				// note: no cmd generated
+			}
+			break;
+		case MSG_TERMINAL_CHANGE:
+			{
+				AppId d = cast<AppId>(msg); msg += sizeof(AppId);
+				unsigned v = cast<unsigned>(msg); msg += sizeof(unsigned);
+				FDU_LOG(INFO) << "change terminal to " << boost::format("0x%8x") % ntohl(v);
+				TerminalChangeCommand * cmd = new TerminalChangeCommand(d, v);
 				c = CommandPtr(cmd);
 			}
 			break;

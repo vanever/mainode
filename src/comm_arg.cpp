@@ -58,6 +58,8 @@ bool CommArg::parse_info_file( const char * file )
 	max_send_speed = pt.get<unsigned>("max_send_speed", 100000);	// need confirm
 	load_update_interval = pt.get<unsigned>("load_update_interval", 2);	// 20ms as a unit, 2 means 2 * 20ms
 
+	disable_sending_report_timeout = pt.get<int>("disable_sending_report_timeout", 0);	// 20ms as a unit, 2 means 2 * 20ms
+
 	ASSERT(bind_ip.size(), "bind ip empty");
 	ASSERT(command_bind_ip.size(), "command bind ip empty");
 
@@ -68,6 +70,7 @@ bool CommArg::parse_info_file( const char * file )
 		ASSERTS(stoi(v.second.data()) == load_args.size());
 		arg.lib = v.second.get<string>("lib");
 		arg.source = v.second.get<string>("source");
+		arg.source_repeat_times = v.second.get<unsigned>("source_repeat_times");
 		arg.speed_file = v.second.get<string>("speed_file");
 		load_args.push_back(arg);
 	}

@@ -14,8 +14,6 @@ using namespace std;
 
 #define PRINT_RANGES
 
-static const unsigned int END_KEY = 0xFFFFFFFF;
-
 void MatchAnalyser::handle_packet( Packet & pkt, const udp::endpoint & from_addr )
 {
 	static unsigned count = 0;

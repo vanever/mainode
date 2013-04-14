@@ -46,3 +46,8 @@ unsigned SpeedManager::get_next_pause_time() const
 	idx_ = next(idx_);
 	return speedlist_[idx_] * weight_;
 }
+
+void SpeedManager::set_weight(unsigned v)
+{
+	weight_ = v;
+}

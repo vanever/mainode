@@ -36,6 +36,7 @@ private:
 	bool end();
 	void command_execute_loop();
 	void send_packets_loop();
+	void debug_command_recv();
 
 	boost::asio::io_service io_;
 	datagram_protocol::endpoint client_;

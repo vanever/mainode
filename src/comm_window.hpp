@@ -173,6 +173,10 @@ public:
 
 };
 
+//---------------------------------------------------------------------------------- 
+
+#include <queue>
+
 class CommandWindow : public Basebox
 {
 
@@ -180,14 +184,14 @@ public:
 
 	CommandWindow(int timeout = 100)
 		: TIMEOUT(timeout)
-		, data_valid(false)
 		, need_confirmed(false)
 		, confirmed(false)
 	{
 		FDU_LOG(DEBUG) << "CommandWindow constructed";
 	}
 
-	virtual bool put_condition_not_satisfied() { return box_full() || (need_confirmed && !confirmed); }
+//	virtual bool put_condition_not_satisfied() { return box_full() || (need_confirmed && !confirmed); }
+	virtual bool get_condition_not_satisfied() { return box_empty() || (need_confirmed && !confirmed); }
 
 	DCSPPacketPtr get()
 	{
@@ -198,45 +202,54 @@ public:
 			{	// read end
 				return DCSPPacketPtr();
 			}
+			if (box_empty())
+			{
+				need_confirmed = false;
+			}
 			if (!c_get.timed_wait(lk, boost::posix_time::milliseconds(TIMEOUT)) && (need_confirmed && !confirmed))
 			{
-				FDU_LOG(WARN) << "DCSP Packet timeout";
-				data_valid = true;	// re-send
+				FDU_LOG(WARN) << "DCSP Packet timeout, re-send";
+				static int MAX_TIMEOUT = 300;
+				TIMEOUT = std::min(TIMEOUT + 50, MAX_TIMEOUT);
+				return buff_.front();
 			}
 		}
-		data_valid = false;
+		confirmed = false;
 		c_put.notify_one();
-		return data;
+		return buff_.front();
 	}
 
-	void put(DCSPPacketPtr t, bool consider_timeout = true)
+	void put(DCSPPacketPtr t)
 	{
 		lock lk(monitor);
 		while (put_condition_not_satisfied())
 		{
 			c_put.wait(lk);
 		}
-		data = t;
-		data_valid = true;
-		if (!consider_timeout)
-			need_confirmed = false;
+		buff_.push(t);
+		need_confirmed = true;
 		c_get.notify_one();
 	}
 
-	void mark_confirmed()
+	void mark_confirmed(U16 idx)
 	{
-		confirmed = true;
-		c_put.notify_one();
+		lock lk(monitor);
+		if (idx == buff_.front()->index())
+		{
+			confirmed = true;
+			buff_.pop();	// do pop
+			c_get.notify_one();
+		}
 	}
 
-	virtual std::size_t num_elements() const { return data_valid ? 1 : 0; }
-	virtual std::size_t capacity()     const { return 1; }
+	virtual std::size_t num_elements() const { return buff_.size(); }
+	virtual std::size_t capacity()     const { return 1 << 30; }
 
-protected:
+private:
 
-	DCSPPacketPtr data;
-	const int TIMEOUT;
-	bool data_valid;
+	std::queue<DCSPPacketPtr> buff_;
+	DCSPPacketPtr send_pkt;
+	int TIMEOUT;
 	bool need_confirmed;
 	bool confirmed;
 

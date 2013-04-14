@@ -31,6 +31,11 @@ namespace {
 	}
 }
 
+U16 DCSPPacket::index()
+{
+	return ntohs(reinterpret_cast<ResultPacket *>(this)->report_id);
+}
+
 const std::string ICommand::unsigned_to_string(unsigned ip)
 {
 	u_char c4 = ip & 0xFF;
@@ -210,9 +215,82 @@ void QueryLoadsCommand::reply()
 		cast<U32>(p) = htonl(num_sent); p += sizeof(U32);
 		cast<U32>(p) = htonl(num_unhandled); p += sizeof(U32);
 		cast<U32>(p) = htonl(papp->speed()); p += sizeof(U32);
+		pkt.do_hton();
 		CommandRecvService::instance().send(pkt.to_buffer());
 	}
 	else
 		FDU_LOG(ERR) << "unknown appid " << appid_;
 }
 
+//---------------------------------------------------------------------------------- 
+SetUpdateIntervalCommand::SetUpdateIntervalCommand(AppId appid, unsigned v)
+	: appid_(appid)
+	, v_(v)
+{}
+
+void SetUpdateIntervalCommand::execute()
+{
+	if (AppDomainPtr pa = AppManager::instance().get_domain_by_appid(appid_))
+	{
+		pa->bitfeature_sender()->set_update_interval(v_);
+	}
+	else
+	{
+		foreach (auto apppair, AppManager::instance().domains())
+		{
+			apppair.second->bitfeature_sender()->set_update_interval(v_);
+		}
+	}
+}
+
+void SetUpdateIntervalCommand::reply()
+{
+}
+
+//----------------------------------------------------------------------------------
+SetValueWeightCommand::SetValueWeightCommand(AppId appid, unsigned v)
+	: appid_(appid)
+	, v_(v)
+{}
+
+void SetValueWeightCommand::execute()
+{
+	if (AppDomainPtr pa = AppManager::instance().get_domain_by_appid(appid_))
+	{
+		pa->bitfeature_sender()->set_value_weight(v_);
+	}
+	else
+	{
+		foreach (auto apppair, AppManager::instance().domains())
+		{
+			apppair.second->bitfeature_sender()->set_value_weight(v_);
+		}
+	}
+}
+
+void SetValueWeightCommand::reply()
+{
+}
+
+//---------------------------------------------------------------------------------- 
+TerminalChangeCommand::TerminalChangeCommand(AppId appid, unsigned v)
+	: appid_(appid)
+	, newid_(v)
+{
+}
+
+void TerminalChangeCommand::execute()
+{
+	if (AppDomainPtr pa = AppManager::instance().get_domain_by_appid(appid_))
+	{
+		pa->domain_info_ptr()->TerminalId = newid_;
+	}
+	else
+	{
+		FDU_LOG(ERR) << "cannot found app: " << appid_;
+	}
+}
+
+void TerminalChangeCommand::reply()
+{
+}

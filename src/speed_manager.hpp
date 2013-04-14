@@ -14,6 +14,7 @@ public:
 
 	unsigned get_next_pause_time() const;
 	unsigned original_interval() const { return interval_; }
+	void set_weight(unsigned v);
 
 private:
 

@@ -93,7 +93,9 @@ unsigned MiniTimer::add_onetime_task(unsigned interval, FuncType f)
 
 unsigned MiniTimer::add_period_task(unsigned interval, FuncType f)
 {
-	return add_task_to(interval, f, period_tasks_);
+	unsigned ret = add_task_to(interval, f, period_tasks_);
+	f();
+	return ret;
 }
 
 void MiniTimer::remove_period_task(unsigned id)

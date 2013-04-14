@@ -50,6 +50,7 @@ public:
 	DomainInfoPtr domain_info_ptr() { return domaininfo_; }
 
 	const std::string match_source() const { return match_source_; }
+	unsigned source_repeat_times() const { return source_repeat_times_; }
 	const std::string lib_file() const { return lib_file_; }
 
 	BitFeatureLoader * bitfeature_loader() { return loader_; }
@@ -81,6 +82,7 @@ private:
 	DomainInfoPtr domaininfo_;
 	std::string lib_file_;
 	std::ofstream out_file_;
+	unsigned source_repeat_times_;
 
 	unsigned sent_frames_;
 	
@@ -111,6 +113,8 @@ public:
 		}
 		return AppDomainPtr();
 	}
+
+	AppDomainMap & domains() { return domains_; }
 
 	void report_all(std::ostream & out) {
 		foreach (auto & app, domains_) {

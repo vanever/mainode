@@ -224,7 +224,8 @@ public:
 	const endpoint dest_addr() const;
 	void update_pause_time();
 	unsigned pause_time() const { return paused_time_; }
-	void change_update_interval(unsigned v);
+	void set_update_interval(unsigned v);
+	void set_value_weight(unsigned v);
 
 private:
 

@@ -10,6 +10,7 @@ struct LoadArg
 	std::string lib;
 	std::string source;
 	std::string speed_file;
+	unsigned source_repeat_times;
 };
 
 struct CommArg : boost::noncopyable
@@ -99,6 +100,8 @@ struct CommArg : boost::noncopyable
 	int update_load;
 	unsigned max_send_speed; // frames/second
 	unsigned load_update_interval;
+
+	int disable_sending_report_timeout;
 
 	//---------------------------------------------------------------------------------------
 	// static

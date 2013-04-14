@@ -9,9 +9,11 @@ namespace DCSP {
 	const unsigned MSG_DEL_NODES        = 0x00010011;
 	const unsigned MSG_TELL_LOADS       = 0x00010024;
 	const unsigned MSG_CREATE_DOMAIN    = 0x00010005;
+	const unsigned MSG_TERMINAL_CHANGE  = 0x0001006D;
 	const unsigned MSG_REPLY            = 0x0001006F;
 	const unsigned MSG_OMC_REQ          = 0x00010002;
 	const unsigned MSG_RESULT_RPT       = 0x00030003;
+	const unsigned MSG_REPORT_REPLY     = 0x000300F0;
 
 	const unsigned MSG_QUERY_LOADS      = 0x00020042;
 	const unsigned MSG_REPORT_LOADS     = 0x00020043;
@@ -45,12 +47,13 @@ struct DCSPPacket
 
 	boost::asio::const_buffers_1 to_buffer()
 	{
-		auto ret = boost::asio::buffer((const U08 *)this, 14 + msg_len);
-		do_hton();
+		auto ret = boost::asio::buffer((const U08 *)this, 14 + ntohs(msg_len));
 		return ret;
 	}
 
-	DCSPPacketPtr make_dcsp_packet(const DCSPPacket & p) { return DCSPPacketPtr(new DCSPPacket(p)); }
+	U16 index();	// for result packet only
+
+	static DCSPPacketPtr make_dcsp_packet(const DCSPPacket & p) { return DCSPPacketPtr(new DCSPPacket(p)); }
 
 } __attribute__((packed));
 
@@ -215,15 +218,55 @@ class TerminalChangeCommand : public ICommand
 
 public:
 
-	// TODO
+	TerminalChangeCommand(AppId appid, unsigned new_terminal_pos);
 
-	virtual void execute() {}
-	virtual void reply  () {}
+	virtual void execute();
+	virtual void reply  ();
 
 private:
 
+	AppId appid_;
+	unsigned newid_;
 
 };
+
+//---------------------------------------------------------------------------------- 
+class SetUpdateIntervalCommand : public ICommand
+{
+
+public:
+
+	SetUpdateIntervalCommand(AppId appid, unsigned);
+
+	virtual void execute();
+	virtual void reply  ();
+
+private:
+
+	AppId appid_;
+	unsigned v_;
+
+};
+
+//---------------------------------------------------------------------------------- 
+class SetValueWeightCommand : public ICommand
+{
+
+public:
+
+	SetValueWeightCommand(AppId appid, unsigned);
+
+	virtual void execute();
+	virtual void reply  ();
+
+private:
+
+	AppId appid_;
+	unsigned v_;
+
+};
+
+
 
 typedef boost::shared_ptr<ICommand> CommandPtr;
 
