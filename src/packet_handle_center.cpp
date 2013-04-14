@@ -64,7 +64,7 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 		PACKET_MSG(DEBUG, length, end_point, type, index, "match result");
 		if (MatcherManager::instance().get_matcher_state( end_point ) ==  Matcher::BUSY )
 			MatcherManager::instance().set_matcher_state( end_point, Matcher::SENDING );
-		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point );
+		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point, Matcher::node_type(end_point) );
 		MatchAnalyser::instance().handle_packet(pkt, end_point);
 	}
 
@@ -108,7 +108,7 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 		{
 			FDU_LOG(ERR) << "WANNA_QUIT: cannot find node: " << end_point;
 		}
-		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point );
+		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point, Matcher::node_type(end_point) );
 	}
 
 	//---------------------------------------------------------------------------------- 
@@ -130,7 +130,7 @@ void PacketHandleCenter::handle_packet( PacketPtr p, const udp::endpoint & end_p
 		{
 			FDU_LOG(WARN) << "WANNA_QUIT: cannot find node: " << end_point;
 		}
-		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point );
+		Server::instance().send( ResponPacket(type + 1, index + 1).to_udp_buffer(), end_point, Matcher::node_type(end_point) );
 	}
 
 	//--------------------------------------------------------------------------------------- 

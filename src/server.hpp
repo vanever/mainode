@@ -32,13 +32,24 @@ public:
 	Server (CommArg * arg)
 		: arg_( arg )                                            
 		, io_(  )                                                
-		, local_point_( ip::address::from_string(arg->bind_ip), arg->server_port )
-		, socket_( io_, local_point_ )
-		, send_sock_( io_, udp::endpoint(ip::address::from_string(arg->bind_ip), arg->send_port) )
-		, deadline_( io_ )                                       
-		, recv_pkt_()                                         
-		, recv_buffer_( recv_pkt_.to_udp_buffer() )                  
-		, end_point_(  )                          
+		, local_point_( ip::address::from_string(arg->command_bind_ip), arg->server_port )
+		, mega_point_( ip::address::from_string(arg->mega_bind_ip), arg->server_port )
+		, ib_point_( ip::address::from_string(arg->ib_bind_ip), arg->server_port )
+//		, socket_( io_, local_point_ )
+		, mega_socket_( io_, mega_point_ )
+		, ib_socket_( io_, ib_point_ )
+//		, send_sock_( io_, udp::endpoint(ip::address::from_string(arg->bind_ip), arg->send_port) )
+		, mega_send_sock_( io_, udp::endpoint(ip::address::from_string(arg->mega_bind_ip), arg->send_port) )
+		, ib_send_sock_( io_, udp::endpoint(ip::address::from_string(arg->ib_bind_ip), arg->send_port) )
+//		, deadline_( io_ )                                       
+//		, recv_pkt_()                                         
+		, mega_recv_pkt_()                                         
+		, ib_recv_pkt_()                                         
+		, mega_recv_buffer_( mega_recv_pkt_.to_udp_buffer() )                  
+		, ib_recv_buffer_( ib_recv_pkt_.to_udp_buffer() )                  
+//		, end_point_()
+		, mega_remote_point_(  )                          
+		, ib_remote_point_(  )                          
 
 		, all_comm_end_          ( false )
 		, bitfeature_all_sent_   ( false )
@@ -60,7 +71,7 @@ public:
 
 	//--------------------------------------------------------------------------------------- 
 	// utils
-	void send( const boost::asio::mutable_buffers_1 & buffer, const udp::endpoint & dest );
+	void send( const boost::asio::mutable_buffers_1 & buffer, const udp::endpoint & dest, MATCHER_TYPE type );
 
 	void open_services();
 
@@ -127,19 +138,33 @@ private:
 	//! trying receive all kinds of response or data after sending the first image
 	//! @param   ec
 	//! @param   length
-	void recv_diverse_handler(const boost::system::error_code& ec, size_t length);
+//	void recv_diverse_handler(const boost::system::error_code& ec, size_t length);
+	void mega_recv_diverse_handler(const boost::system::error_code& ec, size_t length);
+	void ib_recv_diverse_handler(const boost::system::error_code& ec, size_t length);
 
 	//----------------------------------------------------------------------------
 	// basic
 	CommArg * arg_;									   	// arg
 	boost::asio::io_service io_;                        // io service
 	boost::asio::ip::udp::endpoint local_point_;				
-	boost::asio::ip::udp::socket socket_;               // main thread socket
-	boost::asio::ip::udp::socket send_sock_;            // main thread socket
-	boost::asio::deadline_timer deadline_;              // timer for getting mac
-	Packet recv_pkt_;                                   // receive packet buffer
-	boost::asio::mutable_buffers_1 recv_buffer_;        // receive asio buffer
-	boost::asio::ip::udp::endpoint end_point_;			// receive endpoint
+	boost::asio::ip::udp::endpoint mega_point_;				
+	boost::asio::ip::udp::endpoint ib_point_;				
+//	boost::asio::ip::udp::socket socket_;               // main thread socket
+	boost::asio::ip::udp::socket mega_socket_;               
+	boost::asio::ip::udp::socket ib_socket_;               
+//	boost::asio::ip::udp::socket send_sock_;            
+	boost::asio::ip::udp::socket mega_send_sock_;      
+	boost::asio::ip::udp::socket ib_send_sock_;       
+//	boost::asio::deadline_timer deadline_;           
+//	Packet recv_pkt_;                               
+	Packet mega_recv_pkt_;                         
+	Packet ib_recv_pkt_;                          
+//	boost::asio::mutable_buffers_1 recv_buffer_; 
+	boost::asio::mutable_buffers_1 mega_recv_buffer_;        
+	boost::asio::mutable_buffers_1 ib_recv_buffer_;        
+//	boost::asio::ip::udp::endpoint end_point_;			
+	boost::asio::ip::udp::endpoint mega_remote_point_;
+	boost::asio::ip::udp::endpoint ib_remote_point_;
 
 	bool all_comm_end_;									// all communicatioin end flag
 	bool bitfeature_all_sent_;

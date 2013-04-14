@@ -40,16 +40,6 @@ std::ostream & operator << (std::ostream & os, const AppId & appid)
 
 //--------------------------------------------------------------------------------------- 
 
-// Matcher::Matcher ( const endpoint_type & e, unsigned nbits, unsigned merge_unit )
-//     : state_( UNCONNECTED )
-//     , endpoint_( e )
-//     , num_load_( 0 )
-//     , domain_id( 0 )
-// {
-//     set_nbits(nbits);
-//     set_merge_unit(merge_unit);
-// }
-
 Matcher::Matcher ( const endpoint_type & e )
 	: state_( UNCONNECTED )
 	, endpoint_( e )
@@ -59,6 +49,7 @@ Matcher::Matcher ( const endpoint_type & e )
 	, result_count_(0)
 	, bitfeature_count_(0)
 {
+	type_ = node_type(endpoint_);
 }
 
 Matcher::Matcher ( const endpoint_type & e, DomainType d )
@@ -80,18 +71,22 @@ Matcher::Matcher ( const endpoint_type & e, DomainType d )
 	}
 	else
 		FDU_LOG(ERR) << "Unknown domain id " << d.DomainId;
+	type_ = node_type(endpoint_);
 }
 
-// bool operator < (MatcherPtr lhs, MatcherPtr rhs)
-// {
-//     unsigned lload = lhs->num_load();
-//     unsigned rload = rhs->num_load();
-//     unsigned thres = CommArg::comm_arg().balance_threshold;
-//     if (lload < thres && rload < thres)
-//         return !(lload < rload);
-//     else
-//         return lload < rload;
-// }
+MATCHER_TYPE Matcher::node_type(const Matcher::endpoint_type & e)
+{
+	string ip = e.address().to_string();
+	if (ip.substr(0, 3) == "192")
+	{
+		return CPU;
+	}
+	if (ip.substr(0, 3) == "172")
+	{
+		return HRCA;
+	}
+	return INVALID_MATCHER_TYPE;
+}
 
 void Matcher::set_merge_unit(unsigned m)
 {

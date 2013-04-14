@@ -23,6 +23,8 @@ struct CommArg : boost::noncopyable
 	
 	std::string    extract_addr;
 	std::string    bind_ip;
+	std::string    mega_bind_ip;
+	std::string    ib_bind_ip;
 /*	std::vector<std::string> images;
 	std::vector<std::string> videos;
 	std::vector<std::string> sources;

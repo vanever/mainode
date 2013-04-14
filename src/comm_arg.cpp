@@ -26,7 +26,9 @@ bool CommArg::parse_info_file( const char * file )
 
 	out_file      = pt.get<string>("out_file", "match_result_%d.xml");
 
-	bind_ip       = pt.get<string>("bind_ip");
+//	bind_ip       = pt.get<string>("bind_ip");
+	mega_bind_ip  = pt.get<string>("mega_bind_ip");
+	ib_bind_ip    = pt.get<string>("ib_bind_ip");
 	server_port               = pt.get<unsigned short>("server_port", 0xFD01);
 	send_port                 = pt.get<unsigned short>("send_port", 0xFD02);
 	fpga_port                 = pt.get<unsigned short>("fpga_port", 0xFD00);
@@ -60,7 +62,8 @@ bool CommArg::parse_info_file( const char * file )
 
 	disable_sending_report_timeout = pt.get<int>("disable_sending_report_timeout", 0);	// 20ms as a unit, 2 means 2 * 20ms
 
-	ASSERT(bind_ip.size(), "bind ip empty");
+	ASSERT(mega_bind_ip.size(), "mega bind ip empty");
+	ASSERT(ib_bind_ip.size(), "ib bind ip empty");
 	ASSERT(command_bind_ip.size(), "command bind ip empty");
 
 	path_format = pt.get<std::string>("path_format", "%s_%d.bin");

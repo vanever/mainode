@@ -234,6 +234,7 @@ private:
 	AppDomain * app_;
 	SpeedManager * speed_manager_;
 	endpoint dest_addr_;
+	MATCHER_TYPE type_;
 	unsigned paused_time_;
 	unsigned last_task_id_;
 

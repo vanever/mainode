@@ -38,8 +38,11 @@ void Server::start_main()
 void Server::open_services()
 {
 	//! open receiving
-	socket_.async_receive_from(recv_buffer_, end_point_,
-			boost::bind(&Server::recv_diverse_handler, this, _1, _2));
+	mega_socket_.async_receive_from(mega_recv_buffer_, mega_remote_point_,
+			boost::bind(&Server::mega_recv_diverse_handler, this, _1, _2));
+
+	ib_socket_.async_receive_from(ib_recv_buffer_, ib_remote_point_,
+			boost::bind(&Server::ib_recv_diverse_handler, this, _1, _2));
 
 	//! ConnectionBuilderService
 	boost::thread t1(
@@ -69,7 +72,7 @@ void Server::open_services()
 	MiniTimer::instance().run();
 }
 
-void Server::recv_diverse_handler(const boost::system::error_code& ec, size_t length)
+void Server::mega_recv_diverse_handler(const boost::system::error_code& ec, size_t length)
 {
 	if (ec)
 	{
@@ -83,20 +86,50 @@ void Server::recv_diverse_handler(const boost::system::error_code& ec, size_t le
 	}
 
 //	disable filter
-	if ( !MatcherManager::instance().exists(end_point_) )
-	{	// filter 
-		FDU_LOG(DEBUG) << "filter packet from " << end_point_;
-		socket_.async_receive_from(recv_buffer_, end_point_,
-				boost::bind(&Server::recv_diverse_handler, this, _1, _2));
+//	if ( !MatcherManager::instance().exists(mega_remote_point_) )
+//	{	// filter 
+//		FDU_LOG(DEBUG) << "filter packet from " << mega_remote_point_;
+//		mega_socket_.async_receive_from(mega_recv_buffer_, mega_remote_point_,
+//				boost::bind(&Server::mega_recv_diverse_handler, this, _1, _2));
+//		return;
+//	}
+
+	mega_recv_pkt_.set_total_len( length + UDP_HEAD_SIZE );	// need confirm
+	mega_recv_pkt_.set_from_point(mega_remote_point_);
+//	FDU_LOG(DEBUG) << "got " << (boost::format("%02x") % (int)recv_pkt_.type()) << " pkt, queue size: " << packet_queue()->num_elements();
+	Server::instance().packet_queue()->put(Packet::make_shared_packet(mega_recv_pkt_));
+	mega_socket_.async_receive_from(mega_recv_buffer_, mega_remote_point_,
+			boost::bind(&Server::mega_recv_diverse_handler, this, _1, _2));
+}
+
+void Server::ib_recv_diverse_handler(const boost::system::error_code& ec, size_t length)
+{
+	if (ec)
+	{
+		ASSERT(0, ec.message());
 		return;
 	}
 
-	recv_pkt_.set_total_len( length + UDP_HEAD_SIZE );	// need confirm
-	recv_pkt_.set_from_point(end_point_);
+	if (all_comm_end())
+	{
+		return;
+	}
+
+//	disable filter
+//	if ( !MatcherManager::instance().exists(ib_remote_point_) )
+//	{	// filter 
+//		FDU_LOG(DEBUG) << "filter packet from " << ib_remote_point_;
+//		ib_socket_.async_receive_from(ib_recv_buffer_, ib_remote_point_,
+//				boost::bind(&Server::ib_recv_diverse_handler, this, _1, _2));
+//		return;
+//	}
+
+	ib_recv_pkt_.set_total_len( length + UDP_HEAD_SIZE );	// need confirm
+	ib_recv_pkt_.set_from_point(ib_remote_point_);
 //	FDU_LOG(DEBUG) << "got " << (boost::format("%02x") % (int)recv_pkt_.type()) << " pkt, queue size: " << packet_queue()->num_elements();
-	Server::instance().packet_queue()->put(Packet::make_shared_packet(recv_pkt_));
-	socket_.async_receive_from(recv_buffer_, end_point_,
-			boost::bind(&Server::recv_diverse_handler, this, _1, _2));
+	Server::instance().packet_queue()->put(Packet::make_shared_packet(ib_recv_pkt_));
+	ib_socket_.async_receive_from(ib_recv_buffer_, ib_remote_point_,
+			boost::bind(&Server::ib_recv_diverse_handler, this, _1, _2));
 }
 
 void dummy_handler(const boost::system::error_code& ) {}
@@ -136,7 +169,7 @@ namespace {
 	}
 }
 
-void Server::send( const boost::asio::mutable_buffers_1 & buffer, const udp::endpoint & dest )
+void Server::send( const boost::asio::mutable_buffers_1 & buffer, const udp::endpoint & dest, MATCHER_TYPE type )
 {
 	static boost::mutex monitor;
 	boost::mutex::scoped_lock lk(monitor);
@@ -151,10 +184,21 @@ void Server::send( const boost::asio::mutable_buffers_1 & buffer, const udp::end
 	}
 #endif
 
-	send_sock_.async_send_to( buffer, dest,
-			//			boost::bind(&Server::send_handler, this, _1, _2)
-			boost::bind(dummy_handler, _1)
-			);
+	switch (type) {
+	case CPU:
+		ib_send_sock_.async_send_to( buffer, dest,
+				boost::bind(dummy_handler, _1)
+				);
+		break;
+	case HRCA:
+		mega_send_sock_.async_send_to( buffer, dest,
+				boost::bind(dummy_handler, _1)
+				);
+		break;
+	default:
+		FDU_LOG(ERR) << "unknown type: " << (int)type;
+		break;
+	}
 }
 
 bool Server::all_comm_end() const

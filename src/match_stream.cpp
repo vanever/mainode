@@ -151,13 +151,14 @@ void NewLibSender::do_run_task()
 
 void NewLibSender::send_packets()
 {
+	MATCHER_TYPE type = Matcher::node_type(dest_);
 	SurfLibWindow * const window = Server::instance().surf_lib_window();
 	Packet * pkt;
 	static size_t cnt = 0;
 	while (pkt = window->get())
 	{ 
 //		FDU_LOG(DEBUG) << "lib sender -> send packet: " << cnt << "th";
-		Server::instance().send( pkt->to_udp_buffer(), dest_ );
+		Server::instance().send( pkt->to_udp_buffer(), dest_, type );
 		if (!(++cnt % 1000))
 		{
 			FDU_LOG(INFO) << "send packets: " << cnt;
@@ -213,7 +214,8 @@ void ConnectionBuilder::do_end_task()
 void ConnectionBuilder::do_build_connection( const endpoint & dest )
 {
 	lock lk( monitor_ );
-	Server::instance().send( pkt_.to_udp_buffer(), dest );
+	MATCHER_TYPE type = Matcher::node_type(dest);
+	Server::instance().send( pkt_.to_udp_buffer(), dest, type );
 	while ( !built_ )
 	{
 		if (!c_wait_.timed_wait( lk, boost::posix_time::milliseconds(CommArg::comm_arg().conn_build_wait_time) ))
@@ -234,7 +236,7 @@ void ConnectionBuilder::do_build_connection( const endpoint & dest )
 			}
 
 			// send again
-			Server::instance().send( pkt_.to_udp_buffer(), dest );
+			Server::instance().send( pkt_.to_udp_buffer(), dest, type );
 		}
 	}
 
@@ -524,7 +526,7 @@ void BitFeatureSender::send_packets_loop()
 	while ( Packet * pkt = window->get() )
 	{
 		FDU_LOG(DEBUG) << "BitFeatureSender -> send packet: " << ++cnt;
-		Server::instance().send( pkt->to_udp_buffer(), dest_addr() );
+		Server::instance().send( pkt->to_udp_buffer(), dest_addr(), type_ );
 		if (pause)
 		{	// control get packet speed
 			usleep( 1000 * paused_time_ );
@@ -541,6 +543,7 @@ void BitFeatureSender::set_dest_addr( const endpoint & addr )
 {
 	ASSERT( Server::instance().bitfeature_window()->box_empty(), "setting address at wrong time: box not empty" );
 	dest_addr_ = addr;
+	type_ = Matcher::node_type(dest_addr_);
 }
 
 void BitFeatureSender::update_pause_time()

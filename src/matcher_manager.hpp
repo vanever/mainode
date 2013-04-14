@@ -32,6 +32,8 @@ typedef std::map<DomainType, DomainInfoPtr> DomainMap;
 
 inline U64 ntohll(U64 x) { return ((U64)htonl((x & 0xFFFFFFFF)) << 32) | htonl(x >> 32); }
 
+enum MATCHER_TYPE { INVALID_MATCHER_TYPE = -1, CPU, HRCA };
+
 struct AppId
 {
 	U16 DomainId;
@@ -177,10 +179,13 @@ public:
 	void increse_bitfeature_count() { ++bitfeature_count_; }
 	void clear_bitfeature_count() { bitfeature_count_ = 0; }
 
+	static MATCHER_TYPE node_type(const endpoint_type & e);
+
 private:
 
 	boost::mutex monitor_;
 	MATCHER_STATE state_;
+	MATCHER_TYPE type_;
 	endpoint_type endpoint_;
 	unsigned num_load_;
 	unsigned nbits_;
